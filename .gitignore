@@ -1,6 +1,8 @@
 # IDE
 .idea/
 *.iml
+*.ipr
+*.iws
 out/
 
 # Build output
