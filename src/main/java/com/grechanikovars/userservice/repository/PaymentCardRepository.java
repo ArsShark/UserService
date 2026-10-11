@@ -7,12 +7,13 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
+import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 
 /**
  * Data access for {@link PaymentCard}: the inherited CRUD plus derived queries by owner and
- * number, and a native bulk update of the active flag.
+ * number,a native bulk update of the active flag and filtered pagination with specifications.
  */
-public interface PaymentCardRepository extends JpaRepository<PaymentCard, Long> {
+public interface PaymentCardRepository extends JpaRepository<PaymentCard, Long>, JpaSpecificationExecutor<PaymentCard> {
 
   /**
    * Finds all cards of a user. {@code UserId} is resolved to the {@code user.id} path.

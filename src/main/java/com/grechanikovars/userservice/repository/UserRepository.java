@@ -7,12 +7,13 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
+import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 
 /**
  * Data access for {@link User}: the inherited CRUD plus a lookup by email, a JPQL query that
- * loads a user together with the cards, and a bulk update of the active flag.
+ * loads a user together with the cards,a bulk update of the active flag and filtered pagination with specifications.
  */
-public interface UserRepository extends JpaRepository<User, Long> {
+public interface UserRepository extends JpaRepository<User, Long>, JpaSpecificationExecutor<User> {
 
   /**
    * Finds a user by email. Emails are stored lowercase, so the caller passes a normalized value.
