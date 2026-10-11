@@ -15,6 +15,8 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
+/** Payment card that belongs to exactly one {@link User}. */
+
 @Entity
 @Table(name = "payment_cards")
 @Getter
@@ -27,8 +29,12 @@ public class PaymentCard extends AuditableEntity {
   @Setter(AccessLevel.NONE)
   private Long id;
 
-  // Owning side of the association. ManyToOne is EAGER by default, so LAZY is explicit.
-  // The setter is package-private: only User.addCard/removeCard keep both sides in sync.
+  /**
+   * Owner of the card. This is the owning side of the association. {@code ManyToOne} is EAGER
+   * by default, so LAZY is set explicitly. The setter is package-private: only
+   * {@link User#addCard} and {@link User#removeCard} keep both sides in sync.
+   */
+
   @ManyToOne(fetch = FetchType.LAZY, optional = false)
   @JoinColumn(name = "user_id", nullable = false)
   @Setter(AccessLevel.PACKAGE)

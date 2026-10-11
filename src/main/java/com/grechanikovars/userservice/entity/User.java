@@ -16,6 +16,11 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
+/**
+ * Application user. A user owns payment cards; the limit of 5 cards is enforced in the
+ * service layer.
+ */
+
 @Entity
 @Table(name = "users")
 @Getter
@@ -43,16 +48,32 @@ public class User extends AuditableEntity {
   @Column(name = "active", nullable = false)
   private boolean active = true;
 
-  // Inverse side of the association: the foreign key lives in payment_cards.
-  // No setter: replacing the collection instance breaks orphanRemoval.
+  /**
+   * Cards of the user. This is the inverse side of the association: the foreign key lives in
+   * {@code payment_cards.user_id}. There is no setter, because replacing the collection
+   * instance breaks {@code orphanRemoval}; use {@link #addCard} and {@link #removeCard}.
+   */
+
   @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
   @Setter(AccessLevel.NONE)
   private List<PaymentCard> cards = new ArrayList<>();
+
+  /**
+   * Adds the card to this user and sets the owning side of the association.
+   *
+   * @param card the card to add
+   */
 
   public void addCard(PaymentCard card) {
     cards.add(card);
     card.setUser(this);
   }
+
+  /**
+   * Removes the card from this user; with {@code orphanRemoval} the card row is deleted.
+   *
+   * @param card the card to remove
+   */
 
   public void removeCard(PaymentCard card) {
     cards.remove(card);
