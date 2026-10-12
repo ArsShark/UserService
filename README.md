@@ -34,6 +34,7 @@ To build the project and run verification:
 ```bash
 .\mvnw verify
 ```
+Requires a running PostgreSQL and the variables above
 
 ## Run the application
 To start the application locally:
@@ -41,3 +42,13 @@ To start the application locally:
 .\mvnw spring-boot:run
 ```
 The service will be available at: http://localhost:8082
+
+| Variable      | Description                              | Example           |
+|---------------|------------------------------------------|-------------------|
+| `SERVER_PORT` | Application server port                  | `8082`            |
+| `LOG_DIR`     | Directory for application logs           | `logs`            |
+| `DB_HOST`     | PostgreSQL host                          | `localhost`       |
+| `DB_PORT`     | PostgreSQL port                          | `5433`            |
+| `DB_NAME`     | Database name                            | `user_service_db` |
+| `DB_USERNAME` | Database user (required, no default)     | `user_service`    |
+| `DB_PASSWORD` | Database password (required, no default) | not stored in Git |
