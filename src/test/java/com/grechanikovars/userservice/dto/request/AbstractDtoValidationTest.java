@@ -1,4 +1,4 @@
-package com.grechanikovars.userservice.dto;
+package com.grechanikovars.userservice.dto.request;
 
 import jakarta.validation.Validation;
 import jakarta.validation.Validator;

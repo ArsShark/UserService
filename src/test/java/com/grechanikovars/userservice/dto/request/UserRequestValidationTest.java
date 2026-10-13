@@ -1,4 +1,4 @@
-package com.grechanikovars.userservice.dto;
+package com.grechanikovars.userservice.dto.request;
 
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -10,7 +10,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.NullAndEmptySource;
 import org.junit.jupiter.params.provider.ValueSource;
-import com.grechanikovars.userservice.dto.request.UserRequest;
 
 /** Verifies the constraints declared on {@link UserRequest}. */
 class UserRequestValidationTest extends AbstractDtoValidationTest {
