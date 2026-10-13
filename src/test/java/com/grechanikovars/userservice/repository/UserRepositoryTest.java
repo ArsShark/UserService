@@ -9,6 +9,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import com.grechanikovars.userservice.entity.PaymentCard;
 import com.grechanikovars.userservice.entity.User;
 import com.grechanikovars.userservice.repository.specification.UserSpecifications;
+import jakarta.persistence.LockModeType;
 import java.time.Instant;
 import java.util.List;
 import org.junit.jupiter.api.Test;
@@ -117,7 +118,19 @@ class UserRepositoryTest extends AbstractRepositoryTest {
 
     assertTrue(userRepository.findByIdWithCards(userId).isPresent());
   }
+  @Test
+  void findByIdForUpdateLocksTheRow() {
+    Long userId = userRepository.save(
+      TestEntities.user("Anna", "Petrova", "anna@example.com")).getId();
+    flushAndClear();
 
+    User found = userRepository.findByIdForUpdate(userId).orElseThrow();
+
+    assertAll(
+      () -> assertEquals("anna@example.com", found.getEmail()),
+      () -> assertEquals(LockModeType.PESSIMISTIC_WRITE, entityManager.getLockMode(found)),
+      () -> assertTrue(userRepository.findByIdForUpdate(Long.MAX_VALUE).isEmpty()));
+  }
   @Test
   void updateActiveByIdChangesFlagAndUpdatedAt() {
     // The entity stays managed on purpose: only clearAutomatically makes findById read fresh data.
