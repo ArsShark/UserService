@@ -2,6 +2,7 @@ package com.grechanikovars.userservice.repository;
 
 import com.grechanikovars.userservice.TestcontainersConfiguration;
 import com.grechanikovars.userservice.config.JpaAuditingConfig;
+import com.grechanikovars.userservice.config.ClockConfig;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
@@ -10,12 +11,12 @@ import org.springframework.context.annotation.Import;
 
 /**
  * Base class for repository tests: a JPA test slice on a real PostgreSQL container. The auditing
- * configuration is imported explicitly, because test slices do not scan {@code @Configuration}
- * classes. Each test runs in a transaction that is rolled back afterwards.
+ * and clock configurations are imported explicitly, because test slices do not scan
+ * {@code @Configuration} classes. Each test runs in a transaction that is rolled back afterwards.
  */
 @DataJpaTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
-@Import({TestcontainersConfiguration.class, JpaAuditingConfig.class})
+@Import({TestcontainersConfiguration.class, JpaAuditingConfig.class, ClockConfig.class})
 abstract class AbstractRepositoryTest {
 
   @PersistenceContext
