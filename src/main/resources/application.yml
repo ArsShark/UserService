@@ -11,10 +11,12 @@ spring:
     open-in-view: false
   liquibase:
     change-log: classpath:db/changelog/db.changelog-master.yaml
+  data:
+    web:
+      pageable:
+        max-page-size: 100
 server:
   port: ${SERVER_PORT:8082}
 logging:
   level:
-    # Hibernate logs the DETAIL of a failed statement, e.g. "Key (number)=(...) already
-    # exists", which contains card numbers and emails. Only real errors are kept.
     org.hibernate.orm.jdbc.error: ERROR

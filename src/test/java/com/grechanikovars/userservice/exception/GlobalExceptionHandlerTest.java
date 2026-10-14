@@ -12,6 +12,7 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import java.sql.SQLException;
+import java.util.Set;
 import java.util.stream.Stream;
 import org.hibernate.exception.ConstraintViolationException;
 import org.junit.jupiter.api.BeforeEach;
@@ -81,6 +82,18 @@ class GlobalExceptionHandlerTest {
       status().isConflict(),
       content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON),
       jsonPath("$.status").value(409),
+      jsonPath("$.detail").value(exception.getMessage()));
+  }
+
+  @Test
+  void mapsInvalidSortPropertyTo400() throws Exception {
+    InvalidSortPropertyException exception = new InvalidSortPropertyException(Set.of("id", "name"));
+    controller.exceptionToThrow = exception;
+
+    mockMvc.perform(get("/test/throw")).andExpectAll(
+      status().isBadRequest(),
+      content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON),
+      jsonPath("$.status").value(400),
       jsonPath("$.detail").value(exception.getMessage()));
   }
 

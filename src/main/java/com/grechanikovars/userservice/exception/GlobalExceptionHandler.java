@@ -88,6 +88,11 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     LOGGER.error("Unhandled exception", ex);
     return internalError();
   }
+  /** Maps a request to sort by a property that is not part of the API to 400. */
+  @ExceptionHandler(InvalidSortPropertyException.class)
+  public ResponseEntity<ProblemDetail> handleInvalidSort(InvalidSortPropertyException ex) {
+    return reject(HttpStatus.BAD_REQUEST, ex);
+  }
 
   /** Adds the list of invalid fields (without rejected values) to the 400 response. */
   @Override
