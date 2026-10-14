@@ -13,3 +13,8 @@ spring:
     change-log: classpath:db/changelog/db.changelog-master.yaml
 server:
   port: ${SERVER_PORT:8082}
+logging:
+  level:
+    # Hibernate logs the DETAIL of a failed statement, e.g. "Key (number)=(...) already
+    # exists", which contains card numbers and emails. Only real errors are kept.
+    org.hibernate.orm.jdbc.error: ERROR
