@@ -9,6 +9,9 @@ import com.grechanikovars.userservice.exception.UserNotFoundException;
 import com.grechanikovars.userservice.mapper.UserMapper;
 import com.grechanikovars.userservice.repository.UserRepository;
 import com.grechanikovars.userservice.repository.specification.UserSpecifications;
+import com.grechanikovars.userservice.config.CacheConfig;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.Locale;
@@ -61,14 +64,17 @@ public class UserService {
     LOGGER.info("Created user with id {}", saved.getId());
     return userMapper.toResponse(saved);
   }
-
   /**
    * Returns a user together with all of its cards.
+   *
+   * <p>The result is cached by user id in the {@code users} cache. The entry is evicted when the
+   * user is updated, activated, deactivated or deleted.
    *
    * @param id user id
    * @return the user with cards
    * @throws UserNotFoundException if there is no such user
    */
+  @Cacheable(cacheNames = CacheConfig.USERS, key = "#id")
   public UserWithCardsResponse getById(Long id) {
     User user = userRepository.findByIdWithCards(id)
       .orElseThrow(() -> new UserNotFoundException(id));
@@ -91,6 +97,7 @@ public class UserService {
   /**
    * Replaces name, surname, birth date and email of a user. The active flag and the cards are
    * not changed.
+   * Evicts the user from the cache.
    *
    * @param id user id
    * @param request new user data
@@ -98,6 +105,7 @@ public class UserService {
    * @throws UserNotFoundException if there is no such user
    * @throws EmailAlreadyExistsException if the new email belongs to another user
    */
+  @CacheEvict(cacheNames = CacheConfig.USERS, key = "#id")
   @Transactional
   public UserResponse update(Long id, UserRequest request) {
     User user = getUserOrThrow(id);
@@ -115,12 +123,14 @@ public class UserService {
 
   /**
    * Activates or deactivates a user. The cards keep their own active flags.
+   * Evicts the user from the cache.
    *
    * @param id user id
    * @param active the new value of the flag
    * @return the user after the change
    * @throws UserNotFoundException if there is no such user
    */
+  @CacheEvict(cacheNames = CacheConfig.USERS, key = "#id")
   @Transactional
   public UserResponse setActive(Long id, boolean active) {
     int updatedRows = userRepository.updateActiveById(id, active, Instant.now(clock));
@@ -134,10 +144,12 @@ public class UserService {
 
   /**
    * Deletes a user together with its cards.
+   * Evicts the user from the cache.
    *
    * @param id user id
    * @throws UserNotFoundException if there is no such user
    */
+  @CacheEvict(cacheNames = CacheConfig.USERS, key = "#id")
   @Transactional
   public void delete(Long id) {
     User user = getUserOrThrow(id);
