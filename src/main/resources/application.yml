@@ -19,6 +19,8 @@ spring:
       port: ${REDIS_PORT:6379}
       timeout: 500ms
       connect-timeout: 2s
+      repositories:
+        enabled: false
     web:
       pageable:
         max-page-size: 100
