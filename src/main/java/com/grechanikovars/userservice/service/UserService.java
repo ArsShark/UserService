@@ -69,7 +69,8 @@ public class UserService {
    *
    * <p>The result is cached by user id in the {@code users} cache. The entry is evicted when the
    * user is updated, activated, deactivated or deleted.
-   *
+   * <p>The result is cached by user id in the {@code users} cache. The entry is evicted when the
+   * user is updated, activated, deactivated or deleted, and when one of its cards changes.
    * @param id user id
    * @return the user with cards
    * @throws UserNotFoundException if there is no such user

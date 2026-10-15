@@ -29,6 +29,9 @@ import org.springframework.transaction.annotation.Transactional;
  * <p>The class is read-only by default; every method that writes opts in with
  * {@link Transactional}. Entities are converted to DTOs inside the transaction, because
  * open-in-view is disabled and lazy associations cannot be read after it ends.
+ * <p>Every change of a card evicts its owner from the user cache, because the cached user
+ * contains its cards. The eviction runs inside the transaction of the method, just before the
+ * commit; a read that slips in between can cache stale data for at most the TTL of the cache.
  */
 @Service
 @Transactional(readOnly = true)
@@ -43,16 +46,19 @@ public class PaymentCardService {
   private final UserRepository userRepository;
   private final PaymentCardMapper paymentCardMapper;
   private final Clock clock;
+  private final UserCacheEvictor userCacheEvictor;
 
   public PaymentCardService(
     PaymentCardRepository paymentCardRepository,
     UserRepository userRepository,
     PaymentCardMapper paymentCardMapper,
-    Clock clock) {
+    Clock clock,
+    UserCacheEvictor userCacheEvictor) {
     this.paymentCardRepository = paymentCardRepository;
     this.userRepository = userRepository;
     this.paymentCardMapper = paymentCardMapper;
     this.clock = clock;
+    this.userCacheEvictor = userCacheEvictor;
   }
 
   /**
@@ -60,6 +66,7 @@ public class PaymentCardService {
    *
    * <p>The owner row is locked first, so two concurrent requests for the same user cannot both
    * pass the limit check. The lock is released when the transaction ends.
+   * <p>Evicts the owner of the card from the user cache.
    *
    * @param userId owner id
    * @param request card data
@@ -83,6 +90,7 @@ public class PaymentCardService {
     // Explicit save: the id is needed for the response and for the log message.
     PaymentCard saved = paymentCardRepository.save(card);
     LOGGER.info("Created payment card with id {} for user with id {}", saved.getId(), userId);
+    userCacheEvictor.evict(userId);
     return paymentCardMapper.toResponse(saved);
   }
 
@@ -132,6 +140,7 @@ public class PaymentCardService {
   /**
    * Replaces number, holder and expiration date of a card. The owner and the active flag are
    * not changed.
+   * <p>Evicts the owner of the card from the user cache.
    *
    * @param id card id
    * @param request new card data
@@ -149,12 +158,15 @@ public class PaymentCardService {
     paymentCardMapper.updateEntity(request, card);
     // Flush now: updatedAt is filled by auditing on flush, and the response must contain it.
     PaymentCard saved = paymentCardRepository.saveAndFlush(card);
+    CardResponse response = paymentCardMapper.toResponse(saved);
+    userCacheEvictor.evict(response.userId());
     LOGGER.info("Updated payment card with id {}", id);
-    return paymentCardMapper.toResponse(saved);
+    return response;
   }
 
   /**
    * Activates or deactivates a card.
+   * <p>Evicts the owner of the card from the user cache.
    *
    * @param id card id
    * @param active the new value of the flag
@@ -169,11 +181,14 @@ public class PaymentCardService {
     }
     LOGGER.info("Set active={} for payment card with id {}", active, id);
     // The bulk update cleared the persistence context, so this read returns the new state.
-    return paymentCardMapper.toResponse(getCardOrThrow(id));
+    CardResponse response = paymentCardMapper.toResponse(getCardOrThrow(id));
+    userCacheEvictor.evict(response.userId());
+    return response;
   }
 
   /**
    * Deletes a card.
+   * <p>Evicts the owner of the card from the user cache.
    *
    * @param id card id
    * @throws PaymentCardNotFoundException if there is no such card
@@ -181,7 +196,10 @@ public class PaymentCardService {
   @Transactional
   public void delete(Long id) {
     PaymentCard card = getCardOrThrow(id);
+    // Read the owner id first; the owner is a lazy proxy and its id is available without loading it.
+    Long ownerId = card.getUser().getId();
     paymentCardRepository.delete(card);
+    userCacheEvictor.evict(ownerId);
     LOGGER.info("Deleted payment card with id {}", id);
   }
 

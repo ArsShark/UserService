@@ -7,7 +7,12 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static com.grechanikovars.userservice.service.ServiceTestEntities.card;
 
+import com.grechanikovars.userservice.dto.request.CardRequest;
+import com.grechanikovars.userservice.dto.response.CardResponse;
+import com.grechanikovars.userservice.entity.PaymentCard;
+import com.grechanikovars.userservice.repository.PaymentCardRepository;
 import com.grechanikovars.userservice.config.CacheConfig;
 import com.grechanikovars.userservice.dto.request.UserRequest;
 import com.grechanikovars.userservice.dto.response.UserResponse;
@@ -36,15 +41,19 @@ import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.context.junit.jupiter.SpringJUnitConfig;
 
-/** Tests that a failing cache never fails {@link UserService}: the cache is fail-open. */
-@SpringJUnitConfig({CacheConfig.class, UserService.class, UserMapperImpl.class,
-  PaymentCardMapperImpl.class, UserServiceCacheFailureTest.TestConfig.class})
+/** Tests that a failing cache never fails the services that use it: the cache is fail-open. */
+@SpringJUnitConfig({CacheConfig.class, UserService.class, PaymentCardService.class,
+  UserCacheEvictor.class, UserMapperImpl.class, PaymentCardMapperImpl.class,
+  UserServiceCacheFailureTest.TestConfig.class})
 @TestPropertySource(properties = "app.cache.users-ttl=10m")
 class UserServiceCacheFailureTest {
 
   private static final Long USER_ID = 7L;
   private static final UserRequest REQUEST = new UserRequest("Ivan", "Petrov",
     LocalDate.of(1990, 5, 17), "ivan@example.com");
+  private static final Long CARD_ID = 42L;
+  private static final CardRequest CARD_REQUEST = new CardRequest("4111111111111111",
+    "IVAN PETROV", LocalDate.of(2032, 12, 31));
 
   @Autowired
   private UserService userService;
@@ -52,12 +61,22 @@ class UserServiceCacheFailureTest {
   @MockitoBean
   private UserRepository userRepository;
 
+  @Autowired
+  private PaymentCardService paymentCardService;
+
+  @MockitoBean
+  private PaymentCardRepository paymentCardRepository;
+
   @BeforeEach
   void prepare() {
     User user = user(USER_ID);
     when(userRepository.findByIdWithCards(USER_ID)).thenReturn(Optional.of(user));
     when(userRepository.findById(USER_ID)).thenReturn(Optional.of(user));
     when(userRepository.saveAndFlush(any(User.class))).thenAnswer(call -> call.getArgument(0));
+    PaymentCard card = card(CARD_ID, user, CARD_REQUEST.number());
+    when(paymentCardRepository.findById(CARD_ID)).thenReturn(Optional.of(card));
+    when(paymentCardRepository.saveAndFlush(any(PaymentCard.class)))
+      .thenAnswer(call -> call.getArgument(0));
   }
 
   @Test
@@ -74,6 +93,13 @@ class UserServiceCacheFailureTest {
     UserResponse response = userService.update(USER_ID, REQUEST);
 
     assertEquals(USER_ID, response.id());
+  }
+
+  @Test
+  void cardChangeSucceedsWhenTheEvictionFails() {
+    CardResponse response = paymentCardService.update(CARD_ID, CARD_REQUEST);
+
+    assertEquals(CARD_ID, response.id());
   }
 
   /** A cache that is down: it knows its name and throws on every other call. */
