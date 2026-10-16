@@ -1,0 +1,119 @@
+package com.grechanikovars.userservice.integration;
+
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+import com.grechanikovars.userservice.RedisTestcontainersConfiguration;
+import com.grechanikovars.userservice.TestcontainersConfiguration;
+import com.jayway.jsonpath.JsonPath;
+import java.time.Instant;
+import java.util.Objects;
+import java.util.Set;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Tag;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.context.annotation.Import;
+import org.springframework.data.redis.core.RedisCallback;
+import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.http.MediaType;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.MvcResult;
+
+/**
+ * Base class of the integration tests: the whole application on real PostgreSQL and Redis
+ * containers, driven through MockMvc.
+ *
+ * <p>All subclasses share one Spring context and with it one pair of containers, because the
+ * containers are beans of the context and a second context would start a second pair. So
+ * subclasses must not change the context: no {@code @MockitoBean}, {@code @TestPropertySource},
+ * {@code @DirtiesContext} or extra {@code @Import}. Properties that every test needs belong
+ * to this class.
+ *
+ * <p>The tests are not transactional on purpose. A test transaction would hide the commit, and
+ * with it the cache eviction after the commit, the row locks and the concurrent requests that
+ * the integration tests are written to check. Instead, {@link #resetState()} empties the
+ * database and Redis and resets the clock before every test.
+ */
+@Tag("integration")
+@SpringBootTest
+@AutoConfigureMockMvc
+@Import({TestcontainersConfiguration.class, RedisTestcontainersConfiguration.class,
+  TestClockConfiguration.class})
+abstract class AbstractIntegrationTest {
+
+  /** The instant the test clock shows at the start of every test. */
+  protected static final Instant START = Instant.parse("2026-10-16T10:00:00Z");
+
+  private static final String CACHE_KEY_PATTERN = "user-service:*";
+
+  @Autowired
+  protected MockMvc mockMvc;
+
+  @Autowired
+  protected JdbcTemplate jdbcTemplate;
+
+  @Autowired
+  protected StringRedisTemplate redisTemplate;
+
+  @Autowired
+  protected MutableClock clock;
+
+  /**
+   * Brings the shared state to the initial one: both tables are emptied and the identity
+   * counters restart, so the first user of every test has the id 1; Redis is flushed; the clock
+   * shows {@link #START}.
+   */
+  @BeforeEach
+  protected void resetState() {
+    // Only the tables of the application, not the tables of Liquibase.
+    jdbcTemplate.execute("TRUNCATE TABLE payment_cards, users RESTART IDENTITY CASCADE");
+    redisTemplate.execute((RedisCallback<Void>) connection -> {
+      connection.serverCommands().flushAll();
+      return null;
+    });
+    clock.set(START);
+  }
+
+  /**
+   * Creates a user through the REST API and checks that the answer is 201.
+   *
+   * @return the id of the created user
+   */
+  protected long createUser(String name, String surname, String email) throws Exception {
+    String body = String.format("""
+      {"name": "%s", "surname": "%s", "birthDate": "1990-05-17", "email": "%s"}
+      """, name, surname, email);
+    MvcResult result = mockMvc.perform(post("/api/users")
+        .contentType(MediaType.APPLICATION_JSON)
+        .content(body))
+      .andExpect(status().isCreated())
+      .andReturn();
+    return idOf(result);
+  }
+
+  /** Reads the {@code id} field of a JSON response. */
+  protected static long idOf(MvcResult result) throws Exception {
+    Number id = JsonPath.read(result.getResponse().getContentAsString(), "$.id");
+    return id.longValue();
+  }
+
+  /** Counts the rows of a table of the application. */
+  protected long countRows(String table) {
+    Long count = jdbcTemplate.queryForObject(
+      String.format("SELECT count(*) FROM %s", table), Long.class);
+    return Objects.requireNonNull(count);
+  }
+
+  /** The Redis key of a cached user, as the cache configuration builds it. */
+  protected static String userCacheKey(long userId) {
+    return String.format("user-service:users::%d", userId);
+  }
+
+  /** All keys of the application in Redis. */
+  protected Set<String> cacheKeys() {
+    return Objects.requireNonNullElse(redisTemplate.keys(CACHE_KEY_PATTERN), Set.of());
+  }
+}
