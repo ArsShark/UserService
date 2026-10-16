@@ -11,7 +11,7 @@ import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 
 /**
  * Data access for {@link PaymentCard}: the inherited CRUD plus derived queries by owner and
- * number,a native bulk update of the active flag and filtered pagination with specifications.
+ * number, a native bulk update of the active flag, and filtered pagination with specifications.
  */
 public interface PaymentCardRepository extends JpaRepository<PaymentCard, Long>, JpaSpecificationExecutor<PaymentCard> {
 
