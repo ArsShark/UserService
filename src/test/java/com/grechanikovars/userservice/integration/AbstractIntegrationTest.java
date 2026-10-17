@@ -1,14 +1,18 @@
 package com.grechanikovars.userservice.integration;
 
+import static org.hamcrest.Matchers.contains;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.grechanikovars.userservice.RedisTestcontainersConfiguration;
 import com.grechanikovars.userservice.TestcontainersConfiguration;
 import com.jayway.jsonpath.JsonPath;
 import java.time.Instant;
+import java.util.Arrays;
 import java.util.Objects;
 import java.util.Set;
+import org.hamcrest.Matcher;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -21,6 +25,7 @@ import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
+import org.springframework.test.web.servlet.ResultMatcher;
 
 /**
  * Base class of the integration tests: the whole application on real PostgreSQL and Redis
@@ -83,15 +88,45 @@ abstract class AbstractIntegrationTest {
    * @return the id of the created user
    */
   protected long createUser(String name, String surname, String email) throws Exception {
-    String body = String.format("""
-      {"name": "%s", "surname": "%s", "birthDate": "1990-05-17", "email": "%s"}
-      """, name, surname, email);
     MvcResult result = mockMvc.perform(post("/api/users")
         .contentType(MediaType.APPLICATION_JSON)
-        .content(body))
+        .content(userJson(name, surname, email)))
       .andExpect(status().isCreated())
       .andReturn();
     return idOf(result);
+  }
+
+  /**
+   * Creates a card through the REST API and checks that the answer is 201.
+   *
+   * @return the id of the created card
+   */
+  protected long createCard(long userId, String number) throws Exception {
+    MvcResult result = mockMvc.perform(post("/api/users/{userId}/cards", userId)
+        .contentType(MediaType.APPLICATION_JSON)
+        .content(cardJson(number, "IVAN PETROV", "2032-12-31")))
+      .andExpect(status().isCreated())
+      .andReturn();
+    return idOf(result);
+  }
+
+  /** JSON body of a user request. */
+  protected static String userJson(String name, String surname, String email) {
+    return String.format("""
+      {"name": "%s", "surname": "%s", "birthDate": "1990-05-17", "email": "%s"}
+      """, name, surname, email);
+  }
+
+  /** JSON body of a card request. */
+  protected static String cardJson(String number, String holder, String expirationDate) {
+    return String.format("""
+      {"number": "%s", "holder": "%s", "expirationDate": "%s"}
+      """, number, holder, expirationDate);
+  }
+
+  /** A valid 16-digit card number that is different for every index. */
+  protected static String cardNumber(int index) {
+    return String.format("41111111111%05d", index);
   }
 
   /** Reads the {@code id} field of a JSON response. */
@@ -115,5 +150,16 @@ abstract class AbstractIntegrationTest {
   /** All keys of the application in Redis. */
   protected Set<String> cacheKeys() {
     return Objects.requireNonNullElse(redisTemplate.keys(CACHE_KEY_PATTERN), Set.of());
+  }
+
+  /** Matches an error response in the RFC 9457 format, {@code application/problem+json}. */
+  protected static ResultMatcher problemJson() {
+    return content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON);
+  }
+
+  /** Matches a JSON array of ids that holds exactly the given ids in the given order. */
+  protected static Matcher<Iterable<? extends Integer>> idsInOrder(long... ids) {
+    Integer[] expected = Arrays.stream(ids).mapToObj(id -> (int) id).toArray(Integer[]::new);
+    return contains(expected);
   }
 }
