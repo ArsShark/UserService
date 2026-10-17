@@ -36,6 +36,38 @@ To build the project and run verification:
 ```
 Requires Docker: Testcontainers starts PostgreSQL and Redis for the tests
 
+## Tests
+
+All tests need Docker: Testcontainers starts PostgreSQL 18 and Redis 7 on random ports, so
+no local database or Redis is required, and a local one is not touched.
+
+```bash
+.\mvnw test
+```
+
+Useful variations:
+
+```bash
+.\mvnw test "-DexcludedGroups=integration"   # everything except the integration tests
+.\mvnw "-Dtest=UserServiceTest" test           # one test class
+```
+
+| Layer | Package | What it uses |
+|-------|---------|--------------|
+| Unit tests of the services | `service` | Mockito only, no Spring |
+| DTO validation, mappers, cache configuration | `dto`, `mapper`, `config` | plain JUnit or a tiny Spring context |
+| Cache wiring of the services | `service` | Spring context with an in-memory cache |
+| Repositories | `repository` | `@DataJpaTest` on a PostgreSQL container |
+| Controllers and error handling | `controller`, `exception` | `@WebMvcTest` |
+| Integration tests | `integration` | the whole application on PostgreSQL and Redis containers, driven by MockMvc |
+
+The integration tests extend `AbstractIntegrationTest`. All of them share one Spring context
+(and so one pair of containers), therefore they must not use `@MockitoBean`,
+`@TestPropertySource` or `@DirtiesContext`. They are not transactional: before every test the
+base class empties the tables, flushes Redis and resets a controllable test clock.
+
+`.\mvnw test` also writes a JaCoCo coverage report to `target/site/jacoco/index.html`.
+
 ## Run the application
 To start the application locally:
 ```bash
