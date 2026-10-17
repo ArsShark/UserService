@@ -8,11 +8,14 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.grechanikovars.userservice.RedisTestcontainersConfiguration;
 import com.grechanikovars.userservice.TestcontainersConfiguration;
 import com.jayway.jsonpath.JsonPath;
+import jakarta.persistence.EntityManagerFactory;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.Objects;
 import java.util.Set;
 import org.hamcrest.Matcher;
+import org.hibernate.SessionFactory;
+import org.hibernate.stat.Statistics;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -41,9 +44,12 @@ import org.springframework.test.web.servlet.ResultMatcher;
  * with it the cache eviction after the commit, the row locks and the concurrent requests that
  * the integration tests are written to check. Instead, {@link #resetState()} empties the
  * database and Redis and resets the clock before every test.
+ *
+ * <p>Hibernate statistics are switched on for the whole context, so tests can count the
+ * statements and sessions of a request and prove that a cached read never reaches the database.
  */
 @Tag("integration")
-@SpringBootTest
+@SpringBootTest(properties = "spring.jpa.properties.hibernate.generate_statistics=true")
 @AutoConfigureMockMvc
 @Import({TestcontainersConfiguration.class, RedisTestcontainersConfiguration.class,
   TestClockConfiguration.class})
@@ -65,6 +71,9 @@ abstract class AbstractIntegrationTest {
 
   @Autowired
   protected MutableClock clock;
+
+  @Autowired
+  protected EntityManagerFactory entityManagerFactory;
 
   /**
    * Brings the shared state to the initial one: both tables are emptied and the identity
@@ -150,6 +159,11 @@ abstract class AbstractIntegrationTest {
   /** All keys of the application in Redis. */
   protected Set<String> cacheKeys() {
     return Objects.requireNonNullElse(redisTemplate.keys(CACHE_KEY_PATTERN), Set.of());
+  }
+
+  /** The Hibernate statistics of the shared context: statements, sessions and so on. */
+  protected Statistics hibernateStatistics() {
+    return entityManagerFactory.unwrap(SessionFactory.class).getStatistics();
   }
 
   /** Matches an error response in the RFC 9457 format, {@code application/problem+json}. */
