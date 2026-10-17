@@ -1,0 +1,56 @@
+# User Service with its PostgreSQL and Redis.
+# Usage: copy .env.example to .env, set DB_PASSWORD, then run "docker compose up --build".
+name: user-service
+
+services:
+  app:
+    build: .
+    image: user-service:dev
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      # The "docker" profile points the application to the hosts "postgres" and "redis",
+      # which are the service names below.
+      SPRING_PROFILES_ACTIVE: docker
+      DB_NAME: ${DB_NAME:-user_service_db}
+      DB_USERNAME: ${DB_USERNAME:?DB_USERNAME is required, see .env.example}
+      DB_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD is required, see .env.example}
+      CACHE_USERS_TTL: ${CACHE_USERS_TTL:-10m}
+    ports:
+      - "8082:8082"
+    volumes:
+      - app-logs:/app/logs
+
+  postgres:
+    image: postgres:18
+    environment:
+      POSTGRES_DB: ${DB_NAME:-user_service_db}
+      POSTGRES_USER: ${DB_USERNAME:?DB_USERNAME is required, see .env.example}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD is required, see .env.example}
+    volumes:
+      # PostgreSQL 18+ images keep the data directory under /var/lib/postgresql/<major>/docker.
+      - postgres-data:/var/lib/postgresql
+    healthcheck:
+      # "-h 127.0.0.1" forces a TCP connection. Without it pg_isready also succeeds on the
+      # temporary server of the first start, which listens only on a Unix socket.
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  redis:
+    image: redis:7
+    # The cache is disposable: no snapshots, no append-only file.
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  postgres-data:
+  app-logs:
