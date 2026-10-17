@@ -18,10 +18,7 @@ import com.grechanikovars.userservice.exception.UserNotFoundException;
 import com.grechanikovars.userservice.mapper.PaymentCardMapperImpl;
 import com.grechanikovars.userservice.mapper.UserMapperImpl;
 import com.grechanikovars.userservice.repository.UserRepository;
-import java.time.Clock;
-import java.time.Instant;
 import java.time.LocalDate;
-import java.time.ZoneOffset;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.function.Consumer;
@@ -32,12 +29,10 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.convert.ApplicationConversionService;
 import org.springframework.cache.CacheManager;
 import org.springframework.cache.concurrent.ConcurrentMapCacheManager;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.core.convert.ConversionService;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.context.junit.jupiter.SpringJUnitConfig;
@@ -48,7 +43,8 @@ import org.springframework.test.context.junit.jupiter.SpringJUnitConfig;
  * transaction advice is checked with a database in the integration tests.
  */
 @SpringJUnitConfig({CacheConfig.class, UserService.class, UserMapperImpl.class,
-  PaymentCardMapperImpl.class, UserServiceCachingTest.TestConfig.class})
+  PaymentCardMapperImpl.class, SharedCacheTestConfiguration.class,
+  UserServiceCachingTest.TestConfig.class})
 @TestPropertySource(properties = "app.cache.users-ttl=10m")
 class UserServiceCachingTest {
 
@@ -156,17 +152,6 @@ class UserServiceCachingTest {
     @Bean
     CacheManager cacheManager() {
       return new ConcurrentMapCacheManager(CacheConfig.USERS);
-    }
-
-    @Bean
-    Clock clock() {
-      return Clock.fixed(Instant.parse("2026-10-15T10:15:30Z"), ZoneOffset.UTC);
-    }
-
-    /** Lets {@code @Value} convert {@code 10m} to a Duration outside of a Spring Boot context. */
-    @Bean
-    ConversionService conversionService() {
-      return ApplicationConversionService.getSharedInstance();
     }
   }
 }
