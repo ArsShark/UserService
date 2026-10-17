@@ -84,11 +84,16 @@ abstract class AbstractIntegrationTest {
   protected void resetState() {
     // Only the tables of the application, not the tables of Liquibase.
     jdbcTemplate.execute("TRUNCATE TABLE payment_cards, users RESTART IDENTITY CASCADE");
+    flushRedis();
+    clock.set(START);
+  }
+
+  /** Removes everything from Redis. */
+  protected void flushRedis() {
     redisTemplate.execute((RedisCallback<Void>) connection -> {
       connection.serverCommands().flushAll();
       return null;
     });
-    clock.set(START);
   }
 
   /**
