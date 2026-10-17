@@ -1,7 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <Configuration status="WARN">
     <Properties>
-        <Property name="LOG_DIR">${env:LOG_DIR:-logs}</Property>
+        <!-- Not named LOG_DIR: a property with the same name as the environment variable
+             made Log4j warn about an infinite loop in property interpolation. -->
+        <Property name="logDirectory">${env:LOG_DIR:-logs}</Property>
         <Property name="LOG_PATTERN">%d{yyyy-MM-dd HH:mm:ss.SSS} %-5level [%t] %c{1.} - %msg%n</Property>
     </Properties>
     <Appenders>
@@ -9,8 +11,8 @@
             <PatternLayout pattern="${LOG_PATTERN}"/>
         </Console>
         <RollingFile name="File"
-                     fileName="${LOG_DIR}/user-service.log"
-                     filePattern="${LOG_DIR}/user-service-%d{yyyy-MM-dd}-%i.log.gz">
+                     fileName="${logDirectory}/user-service.log"
+                     filePattern="${logDirectory}/user-service-%d{yyyy-MM-dd}-%i.log.gz">
             <PatternLayout pattern="${LOG_PATTERN}"/>
             <Policies>
                 <TimeBasedTriggeringPolicy/>
