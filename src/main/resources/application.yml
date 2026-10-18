@@ -1,10 +1,14 @@
 spring:
   application:
     name: user-service
+  profiles:
+    # Used when no profile is set (IDE, .\mvnw spring-boot:run). Docker sets SPRING_PROFILES_ACTIVE=docker.
+    default: local
   cache:
     type: redis
   datasource:
-    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5433}/${DB_NAME:user_service_db}
+    # The URL, the Redis host and the Redis port are defined per profile:
+    # application-local.yml and application-docker.yml.
     username: ${DB_USERNAME}
     password: ${DB_PASSWORD}
   jpa:
@@ -15,8 +19,6 @@ spring:
     change-log: classpath:db/changelog/db.changelog-master.yaml
   data:
     redis:
-      host: ${REDIS_HOST:localhost}
-      port: ${REDIS_PORT:6379}
       timeout: 500ms
       connect-timeout: 2s
       repositories:
