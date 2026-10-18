@@ -1,5 +1,7 @@
 # User Service
 
+[![CI](https://github.com/ArsShark/UserService/actions/workflows/ci.yml/badge.svg)](https://github.com/ArsShark/UserService/actions/workflows/ci.yml)
+
 User management microservice of the course e-commerce application
 (Innowise Java Advanced). Part of a system with Authentication Service,
 API Gateway, Order Service and Payment Service.
@@ -175,6 +177,41 @@ base class empties the tables, flushes Redis and resets a controllable test cloc
 
 `.\mvnw test` also writes a JaCoCo coverage report to `target/site/jacoco/index.html`.
 
+## CI pipeline
+
+The workflow `.github/workflows/ci.yml` (GitHub Actions) runs on every push, on pull requests into
+`main` and manually (Actions > CI > Run workflow).
+
+| Job      | Step            | What it does |
+|----------|-----------------|--------------|
+| `build`  | Build           | `./mvnw -DskipTests package` |
+| `build`  | Test            | all tests (unit and integration, Testcontainers) and the JaCoCo report |
+| `build`  | Code analysis   | SonarQube Cloud; only on pull requests into `main` and on pushes to `main` |
+| `build`  | Upload reports  | JUnit and JaCoCo reports as the artifact `reports` (kept 14 days) |
+| `docker` | Build and push  | builds the image from the `Dockerfile` on every run (after `build` succeeded); pushes it to GHCR only on pushes to `main` or on a manual run with `publish` ticked |
+
+The free plan of SonarQube Cloud analyses only `main` and pull requests into `main`, so pushes to
+other branches skip the analysis. The quality gate result does not fail the pipeline yet.
+
+Published image (the package must be public to pull it without a login):
+
+```powershell
+docker pull ghcr.io/arsshark/userservice:latest      # last build of main
+docker pull ghcr.io/arsshark/userservice:sha-<short commit id>
+```
+
+It runs like the locally built image, see "In a Docker container".
+
+Repository settings used by the pipeline (Settings > Secrets and variables > Actions):
+
+| Name                   | Kind     | Purpose |
+|------------------------|----------|---------|
+| `SONAR_TOKEN`          | secret   | token of the SonarQube Cloud project |
+| `SONAR_ORGANIZATION`   | variable | SonarQube Cloud organization key |
+| `SONAR_PROJECT_KEY`    | variable | SonarQube Cloud project key |
+
+Pushing to GHCR uses the built-in `GITHUB_TOKEN`, no extra secret is needed.
+
 ## Troubleshooting
 
 | Symptom | Cause and fix |
@@ -184,4 +221,7 @@ base class empties the tables, flushes Redis and resets a controllable test cloc
 | `DB_PASSWORD is required` from Compose | `.env` is missing or has no password: copy `.env.example` to `.env` |
 | `docker build` asks for 1 argument | The build context is missing: `docker build -t user-service:dev .` (note the dot) |
 | Port 8082 is already in use | Stop the locally running application or the other container |
+| CI: `Not authorized` or `Project not found` in "Code analysis" | `SONAR_TOKEN`, `SONAR_ORGANIZATION` or `SONAR_PROJECT_KEY` is missing or wrong; names must match exactly |
+| CI: "You are running CI analysis while Automatic Analysis is enabled" | Turn off Automatic Analysis in the SonarQube Cloud project (Administration > Analysis Method) |
+| CI: `denied` when pushing the image | Settings > Actions > General > Workflow permissions must allow the job to write packages |
 | The application starts, but the first request is slow with Redis down | Expected: a failed cache operation waits up to 0.5 s, then the database is used |
