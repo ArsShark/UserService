@@ -8,3 +8,8 @@ spring:
     redis:
       host: ${REDIS_HOST:redis}
       port: ${REDIS_PORT:6379}
+app:
+  security:
+    # The internal address of the Authentication Service in the Compose network: its service name,
+    # never the Gateway (the Gateway does not route the key set).
+    jwks-uri: ${AUTH_JWKS_URI:http://authentication-service:8081/.well-known/jwks.json}

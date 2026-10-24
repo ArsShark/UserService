@@ -29,6 +29,10 @@ spring:
 app:
   cache:
     users-ttl: ${CACHE_USERS_TTL:10m}
+  security:
+    # The expected issuer of the access tokens: the same value as JWT_ISSUER of the Authentication
+    # Service. The address of its key set (jwks-uri) is defined per profile.
+    jwt-issuer: ${JWT_ISSUER:authentication-service}
 server:
   port: ${SERVER_PORT:8082}
 logging:
