@@ -3,6 +3,7 @@ package com.grechanikovars.userservice.controller;
 import com.grechanikovars.userservice.dto.request.CardRequest;
 import com.grechanikovars.userservice.dto.response.CardResponse;
 import com.grechanikovars.userservice.dto.response.PageResponse;
+import com.grechanikovars.userservice.security.AccessRules;
 import com.grechanikovars.userservice.service.PaymentCardService;
 import jakarta.validation.Valid;
 import java.net.URI;
@@ -11,6 +12,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
@@ -52,6 +54,7 @@ public class PaymentCardController {
    * Creates a card for the given user. Returns 201 with a {@code Location} header pointing to
    * the new card under {@code /api/cards}.
    */
+  @PreAuthorize(AccessRules.OWN_USER_BY_USER_ID)
   @PostMapping("/users/{userId}/cards")
   public ResponseEntity<CardResponse> create(
     @PathVariable Long userId, @Valid @RequestBody CardRequest request) {
@@ -64,12 +67,14 @@ public class PaymentCardController {
   }
 
   /** Returns all cards of a user. A user has at most five, so the list is not paged. */
+  @PreAuthorize(AccessRules.OWN_USER_BY_USER_ID)
   @GetMapping("/users/{userId}/cards")
   public ResponseEntity<List<CardResponse>> getAllByUserId(@PathVariable Long userId) {
     return ResponseEntity.ok(paymentCardService.getAllByUserId(userId));
   }
 
   /** Returns one card. */
+  @PreAuthorize(AccessRules.OWN_CARD)
   @GetMapping("/cards/{id}")
   public ResponseEntity<CardResponse> getById(@PathVariable Long id) {
     return ResponseEntity.ok(paymentCardService.getById(id));
@@ -90,25 +95,31 @@ public class PaymentCardController {
   }
 
   /** Replaces the number, holder and expiration date of a card; the owner never changes. */
+  @PreAuthorize(AccessRules.OWN_CARD)
   @PutMapping("/cards/{id}")
   public ResponseEntity<CardResponse> update(
     @PathVariable Long id, @Valid @RequestBody CardRequest request) {
     return ResponseEntity.ok(paymentCardService.update(id, request));
   }
 
-  /** Activates a card. Repeating the call has no further effect. */
+  /**
+   * Activates a card. Repeating the call has no further effect. Only an admin may do it: a user
+   * could otherwise lift a block that an admin put on his card.
+   */
   @PatchMapping("/cards/{id}/activate")
   public ResponseEntity<CardResponse> activate(@PathVariable Long id) {
     return ResponseEntity.ok(paymentCardService.setActive(id, true));
   }
 
   /** Deactivates a card. Repeating the call has no further effect. */
+  @PreAuthorize(AccessRules.OWN_CARD)
   @PatchMapping("/cards/{id}/deactivate")
   public ResponseEntity<CardResponse> deactivate(@PathVariable Long id) {
     return ResponseEntity.ok(paymentCardService.setActive(id, false));
   }
 
   /** Deletes a card. */
+  @PreAuthorize(AccessRules.OWN_CARD)
   @DeleteMapping("/cards/{id}")
   public ResponseEntity<Void> delete(@PathVariable Long id) {
     paymentCardService.delete(id);

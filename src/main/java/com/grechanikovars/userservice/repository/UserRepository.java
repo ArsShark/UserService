@@ -35,6 +35,16 @@ public interface UserRepository extends JpaRepository<User, Long>, JpaSpecificat
   boolean existsByEmail(String email);
 
   /**
+   * Reads the stored email of a user without loading the entity. The access checks use it to
+   * see whether a request changes the email.
+   *
+   * @param id user id
+   * @return the stored (lowercase) email, or an empty optional if there is no such user
+   */
+  @Query("SELECT u.email FROM User u WHERE u.id = :id")
+  Optional<String> findEmailById(@Param("id") Long id);
+
+  /**
    * Finds a user together with the cards in a single query. {@code LEFT JOIN} keeps users
    * without cards. Do not combine this query with pagination: Hibernate would paginate in memory.
    *

@@ -219,7 +219,7 @@ class SecurityIntegrationTest extends AbstractIntegrationTest {
         .andExpect(status().isForbidden());
   }
 
-  /** The ordinary user has no rights yet; his own data is opened by the ownership checks. */
+  /** Only an admin and the Gateway create profiles; a user, even a valid one, may not. */
   @Test
   void aUserTokenIsForbiddenOnTheAdminEndpointsAndNothingIsWritten() throws Exception {
     String token = TestTokens.access().build();

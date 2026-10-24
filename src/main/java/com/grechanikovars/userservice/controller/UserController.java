@@ -4,6 +4,7 @@ import com.grechanikovars.userservice.dto.request.UserRequest;
 import com.grechanikovars.userservice.dto.response.PageResponse;
 import com.grechanikovars.userservice.dto.response.UserResponse;
 import com.grechanikovars.userservice.dto.response.UserWithCardsResponse;
+import com.grechanikovars.userservice.security.AccessRules;
 import com.grechanikovars.userservice.service.UserService;
 import jakarta.validation.Valid;
 import java.net.URI;
@@ -11,6 +12,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
@@ -55,7 +57,8 @@ public class UserController {
     return ResponseEntity.created(location).body(created);
   }
 
-  /** Returns a user together with the user's cards. */
+  /** Returns a user together with the user's cards: an admin, or the user himself. */
+  @PreAuthorize(AccessRules.OWN_USER)
   @GetMapping("/{id}")
   public ResponseEntity<UserWithCardsResponse> getById(@PathVariable Long id) {
     return ResponseEntity.ok(userService.getById(id));
@@ -75,7 +78,11 @@ public class UserController {
     return ResponseEntity.ok(PageResponse.from(page));
   }
 
-  /** Replaces all user data except the active flag. */
+  /**
+   * Replaces all user data except the active flag. A user may replace his own data but not his
+   * email; see {@link AccessRules#OWN_PROFILE_UPDATE}.
+   */
+  @PreAuthorize(AccessRules.OWN_PROFILE_UPDATE)
   @PutMapping("/{id}")
   public ResponseEntity<UserResponse> update(
     @PathVariable Long id, @Valid @RequestBody UserRequest request) {

@@ -14,7 +14,6 @@ import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
 import java.time.Clock;
 import java.time.Instant;
-import java.util.Locale;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.springframework.data.domain.Page;
@@ -54,7 +53,7 @@ public class UserService {
    */
   @Transactional
   public UserResponse create(UserRequest request) {
-    String email = normalizeEmail(request.email());
+    String email = EmailNormalizer.normalize(request.email());
     if (userRepository.existsByEmail(email)) {
       throw new EmailAlreadyExistsException();
     }
@@ -110,7 +109,7 @@ public class UserService {
   @Transactional
   public UserResponse update(Long id, UserRequest request) {
     User user = getUserOrThrow(id);
-    String email = normalizeEmail(request.email());
+    String email = EmailNormalizer.normalize(request.email());
     if (!email.equals(user.getEmail()) && userRepository.existsByEmail(email)) {
       throw new EmailAlreadyExistsException();
     }
@@ -160,9 +159,5 @@ public class UserService {
 
   private User getUserOrThrow(Long id) {
     return userRepository.findById(id).orElseThrow(() -> new UserNotFoundException(id));
-  }
-
-  private static String normalizeEmail(String email) {
-    return email.strip().toLowerCase(Locale.ROOT);
   }
 }

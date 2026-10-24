@@ -8,6 +8,7 @@ import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
+import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
@@ -34,15 +35,17 @@ import org.springframework.web.servlet.HandlerExceptionResolver;
  * {@link ProblemDetailSecurityHandler}.
  *
  * <p>The rules below are the coarse ones: they decide by role and by HTTP method which kind of
- * caller may call an endpoint at all. For now every endpoint under {@code /api} needs the role
- * {@code ADMIN}, so no ordinary user can see anybody's data while the rules for "only your
- * own" are not in place yet.
+ * caller may call an endpoint at all. An endpoint that a {@code USER} may call at all is open to
+ * both roles here, and the controller then asks {@code AccessPolicy} whether the resource is
+ * his own (method security, {@link EnableMethodSecurity}; the expressions are in
+ * {@code AccessRules}). Everything else is for an admin only: the list of all users and of
+ * all cards, creating, activating, deactivating and deleting a user, activating a card.
  *
  * <p>{@code /internal/**} is for other services only. It requires the role
- * {@value InternalKeyAuthenticationFilter#ROLE}, which only {@link InternalKeyAuthenticationFilter}
- * grants, and only for a request with the right internal key. Only the two endpoints of
- * {@code InternalUserController} are opened, each with its method; another method or path under
- * {@code /internal} stays closed. A missing key stops the startup.
+ * {@value InternalKeyAuthenticationFilter#ROLE}, which only the
+ * {@link InternalKeyAuthenticationFilter} grants, and only for a request with the right internal
+ * key. Only the two endpoints of {@code InternalUserController} are opened, each with its method;
+ * another method or path under {@code /internal} stays closed. A missing key stops the startup.
  *
  * <p>The ERROR dispatch is permitted: when the servlet container forwards a failed request to the
  * error page, that internal forward must not be denied again, otherwise the client would see
@@ -51,10 +54,12 @@ import org.springframework.web.servlet.HandlerExceptionResolver;
  */
 @Configuration(proxyBeanMethods = false)
 @EnableWebSecurity
+@EnableMethodSecurity
 @EnableConfigurationProperties(InternalApiProperties.class)
 public class SecurityConfig {
 
   private static final String ADMIN = "ADMIN";
+  private static final String USER = "USER";
   private static final String INTERNAL = InternalKeyAuthenticationFilter.ROLE;
 
   /**
@@ -100,22 +105,26 @@ public class SecurityConfig {
             // Internal endpoints: the Gateway, with the internal key.
             .requestMatchers(HttpMethod.POST, "/internal/users").hasRole(INTERNAL)
             .requestMatchers(HttpMethod.DELETE, "/internal/users/*").hasRole(INTERNAL)
-            // Users.
+            // Users: the list and every change of the whole user are for an admin only.
             .requestMatchers(HttpMethod.POST, "/api/users").hasRole(ADMIN)
-            .requestMatchers(HttpMethod.GET, "/api/users", "/api/users/*").hasRole(ADMIN)
-            .requestMatchers(HttpMethod.PUT, "/api/users/*").hasRole(ADMIN)
+            .requestMatchers(HttpMethod.GET, "/api/users").hasRole(ADMIN)
             .requestMatchers(HttpMethod.PATCH,
                 "/api/users/*/activate", "/api/users/*/deactivate").hasRole(ADMIN)
             .requestMatchers(HttpMethod.DELETE, "/api/users/*").hasRole(ADMIN)
-            // Cards of one user.
-            .requestMatchers(HttpMethod.POST, "/api/users/*/cards").hasRole(ADMIN)
-            .requestMatchers(HttpMethod.GET, "/api/users/*/cards").hasRole(ADMIN)
-            // Cards.
-            .requestMatchers(HttpMethod.GET, "/api/cards", "/api/cards/*").hasRole(ADMIN)
-            .requestMatchers(HttpMethod.PUT, "/api/cards/*").hasRole(ADMIN)
-            .requestMatchers(HttpMethod.PATCH,
-                "/api/cards/*/activate", "/api/cards/*/deactivate").hasRole(ADMIN)
-            .requestMatchers(HttpMethod.DELETE, "/api/cards/*").hasRole(ADMIN)
+            // Own profile: a user reads and replaces his own.
+            .requestMatchers(HttpMethod.GET, "/api/users/*").hasAnyRole(ADMIN, USER)
+            .requestMatchers(HttpMethod.PUT, "/api/users/*").hasAnyRole(ADMIN, USER)
+            // Own cards.
+            .requestMatchers(HttpMethod.POST, "/api/users/*/cards").hasAnyRole(ADMIN, USER)
+            .requestMatchers(HttpMethod.GET, "/api/users/*/cards").hasAnyRole(ADMIN, USER)
+            .requestMatchers(HttpMethod.GET, "/api/cards/*").hasAnyRole(ADMIN, USER)
+            .requestMatchers(HttpMethod.PUT, "/api/cards/*").hasAnyRole(ADMIN, USER)
+            .requestMatchers(HttpMethod.PATCH, "/api/cards/*/deactivate")
+            .hasAnyRole(ADMIN, USER)
+            .requestMatchers(HttpMethod.DELETE, "/api/cards/*").hasAnyRole(ADMIN, USER)
+            // The list of all cards and the activation of a card are for an admin only.
+            .requestMatchers(HttpMethod.GET, "/api/cards").hasRole(ADMIN)
+            .requestMatchers(HttpMethod.PATCH, "/api/cards/*/activate").hasRole(ADMIN)
             .anyRequest().denyAll())
         .build();
   }
