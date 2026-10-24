@@ -21,6 +21,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.grechanikovars.userservice.config.ClockConfig;
+import com.grechanikovars.userservice.config.JwtConfig;
+import com.grechanikovars.userservice.config.SecurityConfig;
 import com.grechanikovars.userservice.dto.request.CardRequest;
 import com.grechanikovars.userservice.dto.response.CardResponse;
 import com.grechanikovars.userservice.exception.CardLimitExceededException;
@@ -36,21 +39,31 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.security.autoconfigure.UserDetailsServiceAutoConfiguration;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
+import org.springframework.context.annotation.Import;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
+import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 /**
  * HTTP contract tests of {@link PaymentCardController}: paths, status codes, headers and JSON
  * shape. The service is a mock, so these tests do not touch a database.
+ *
+ * <p>The security chain is real and every request is made by an admin: who may call which endpoint
+ * is tested in {@code SecurityConfigTest}.
  */
-@WebMvcTest(PaymentCardController.class)
+@WebMvcTest(controllers = PaymentCardController.class,
+  properties = "app.internal.api-key=test-internal-key",
+  excludeAutoConfiguration = UserDetailsServiceAutoConfiguration.class)
+@Import({SecurityConfig.class, JwtConfig.class, ClockConfig.class})
+@WithMockUser(roles = "ADMIN")
 class PaymentCardControllerTest {
 
   private static final Instant NOW = Instant.parse("2030-01-01T10:15:30Z");
