@@ -3,6 +3,7 @@ package com.grechanikovars.userservice.repository;
 import com.grechanikovars.userservice.entity.PaymentCard;
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -22,6 +23,16 @@ public interface PaymentCardRepository extends JpaRepository<PaymentCard, Long>,
    * @return the cards of the user, empty if there are none
    */
   List<PaymentCard> findAllByUserId(Long userId);
+
+  /**
+   * Reads the id of the owner of a card without loading the card or its owner. The access
+   * checks use it to see whether a card belongs to the caller.
+   *
+   * @param id card id
+   * @return the id of the owner, or an empty optional if there is no such card
+   */
+  @Query("SELECT c.user.id FROM PaymentCard c WHERE c.id = :id")
+  Optional<Long> findUserIdById(@Param("id") Long id);
 
   /**
    * Counts the cards of a user. Used by the service layer to enforce the limit of 5 cards.

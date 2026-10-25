@@ -29,6 +29,14 @@ spring:
 app:
   cache:
     users-ttl: ${CACHE_USERS_TTL:10m}
+  internal:
+    # The shared key of the internal endpoints (header X-Internal-Key). There is no real
+    # default: an empty value stops the startup.
+    api-key: ${INTERNAL_API_KEY:}
+  security:
+    # The expected issuer of the access tokens: the same value as JWT_ISSUER of the Authentication
+    # Service. The address of its key set (jwks-uri) is defined per profile.
+    jwt-issuer: ${JWT_ISSUER:authentication-service}
 server:
   port: ${SERVER_PORT:8082}
 logging:

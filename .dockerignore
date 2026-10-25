@@ -9,3 +9,4 @@ src/test/
 .env
 .env.*
 *.md
+postman/

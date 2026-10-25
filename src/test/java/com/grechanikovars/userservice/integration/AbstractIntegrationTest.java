@@ -5,10 +5,14 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.grechanikovars.userservice.JwksTestServer;
 import com.grechanikovars.userservice.RedisTestcontainersConfiguration;
+import com.grechanikovars.userservice.TestKeys;
+import com.grechanikovars.userservice.TestTokens;
 import com.grechanikovars.userservice.TestcontainersConfiguration;
 import com.jayway.jsonpath.JsonPath;
 import jakarta.persistence.EntityManagerFactory;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.Objects;
@@ -26,6 +30,8 @@ import org.springframework.data.redis.core.RedisCallback;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.context.DynamicPropertyRegistry;
+import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.ResultMatcher;
@@ -47,18 +53,45 @@ import org.springframework.test.web.servlet.ResultMatcher;
  *
  * <p>Hibernate statistics are switched on for the whole context, so tests can count the
  * statements and sessions of a request and prove that a cached read never reaches the database.
+ *
+ * <p>The tokens are verified the real way. A small HTTP server plays the key set endpoint of the
+ * Authentication Service, and the application reads its address from {@code app.security.jwks-uri}
+ * like in production. {@link #mockMvc} sends the token of an admin with every request; a test
+ * that needs another caller sets its own {@code Authorization} header, which wins over this
+ * default (see {@code TestSecurityConfiguration}).
  */
 @Tag("integration")
-@SpringBootTest(properties = "spring.jpa.properties.hibernate.generate_statistics=true")
+@SpringBootTest(properties = {
+  "spring.jpa.properties.hibernate.generate_statistics=true",
+  "app.internal.api-key=test-internal-key"})
 @AutoConfigureMockMvc
 @Import({TestcontainersConfiguration.class, RedisTestcontainersConfiguration.class,
-  TestClockConfiguration.class})
+  TestClockConfiguration.class, TestSecurityConfiguration.class})
 abstract class AbstractIntegrationTest {
 
   /** The instant the test clock shows at the start of every test. */
   protected static final Instant START = Instant.parse("2026-10-16T10:00:00Z");
 
+  /**
+   * The token that {@link #mockMvc} sends by default: an admin, valid for ten years, so that a
+   * test that moves the clock far ahead does not lose its caller.
+   */
+  protected static final String ADMIN_TOKEN = TestTokens.admin()
+    .expiresAt(TestTokens.ISSUED_AT.plus(Duration.ofDays(3650)))
+    .build();
+
   private static final String CACHE_KEY_PATTERN = "user-service:*";
+
+  /**
+   * The key set endpoint of the Authentication Service. It is never stopped: its threads are
+   * daemons, so they do not keep the JVM alive.
+   */
+  private static final JwksTestServer JWKS_SERVER = JwksTestServer.start(TestKeys.jwksJson());
+
+  @DynamicPropertySource
+  static void keySetOfTheAuthenticationService(DynamicPropertyRegistry registry) {
+    registry.add("app.security.jwks-uri", JWKS_SERVER::jwksUri);
+  }
 
   @Autowired
   protected MockMvc mockMvc;
@@ -86,6 +119,16 @@ abstract class AbstractIntegrationTest {
     jdbcTemplate.execute("TRUNCATE TABLE payment_cards, users RESTART IDENTITY CASCADE");
     flushRedis();
     clock.set(START);
+  }
+
+  /**
+   * The value of the {@code Authorization} header for a token.
+   *
+   * @param token a compact serialized token
+   * @return the header value
+   */
+  protected static String bearer(String token) {
+    return String.format("Bearer %s", token);
   }
 
   /** Removes everything from Redis. */

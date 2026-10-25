@@ -1,5 +1,7 @@
 # User Service with its PostgreSQL and Redis.
-# Usage: copy .env.example to .env, set DB_PASSWORD, then run "docker compose up --build".
+# Usage: copy .env.example to .env, set DB_PASSWORD and INTERNAL_API_KEY, then run
+# "docker compose up --build". The Authentication Service is not part of this file: the tokens
+# are verified with its key set at AUTH_JWKS_URI (see .env.example).
 name: user-service
 
 services:
@@ -19,6 +21,16 @@ services:
       DB_USERNAME: ${DB_USERNAME:?DB_USERNAME is required, see .env.example}
       DB_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD is required, see .env.example}
       CACHE_USERS_TTL: ${CACHE_USERS_TTL:-10m}
+      # The same key as in the Authentication Service: the Gateway sends it to the endpoints
+      # under /internal. The application does not start without it.
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY:?INTERNAL_API_KEY is required, see .env.example}
+      # Where the public key of the Authentication Service is read (lazily, on the first token).
+      AUTH_JWKS_URI: ${AUTH_JWKS_URI:?AUTH_JWKS_URI is required, see .env.example}
+      JWT_ISSUER: ${JWT_ISSUER:-authentication-service}
+    extra_hosts:
+      # Makes "host.docker.internal" work on Linux too (Docker Desktop has it already): the
+      # Authentication Service of this setup runs on the host.
+      - "host.docker.internal:host-gateway"
     ports:
       - "8082:8082"
     volumes:

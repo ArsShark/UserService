@@ -22,6 +22,8 @@ import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.MediaType;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -183,6 +185,32 @@ class GlobalExceptionHandlerTest {
       status().isMethodNotAllowed(),
       content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON),
       jsonPath("$.status").value(405));
+  }
+
+  /** The constant detail never says why, and the message of the exception is not sent. */
+  @Test
+  void mapsAuthenticationFailuresTo401WithAConstantDetail() throws Exception {
+    controller.exceptionToThrow = new BadCredentialsException("token secret-value expired");
+
+    mockMvc.perform(get("/test/throw")).andExpectAll(
+      status().isUnauthorized(),
+      content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON),
+      jsonPath("$.status").value(401),
+      jsonPath("$.detail").value("Authentication is required"),
+      content().string(not(containsString("secret-value"))));
+  }
+
+  /** Without an explicit handler the catch-all would turn this into a 500. */
+  @Test
+  void mapsAccessDeniedTo403WithAConstantDetail() throws Exception {
+    controller.exceptionToThrow = new AccessDeniedException("card 42 belongs to user 9");
+
+    mockMvc.perform(get("/test/throw")).andExpectAll(
+      status().isForbidden(),
+      content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON),
+      jsonPath("$.status").value(403),
+      jsonPath("$.detail").value("Access is denied"),
+      content().string(not(containsString("card 42"))));
   }
 
   /** Builds the exception Spring raises for a violated constraint, with a row in its message. */

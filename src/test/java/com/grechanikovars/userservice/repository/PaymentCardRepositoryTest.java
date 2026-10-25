@@ -11,6 +11,7 @@ import com.grechanikovars.userservice.entity.User;
 import com.grechanikovars.userservice.repository.specification.PaymentCardSpecifications;
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -43,6 +44,24 @@ class PaymentCardRepositoryTest extends AbstractRepositoryTest {
       .toList();
 
     assertEquals(List.of("4000000000000001", "4000000000000002"), numbers);
+  }
+
+  @Test
+  void findUserIdByIdReadsTheOwnerOfTheCard() {
+    User first = userRepository.save(TestEntities.userWithCards(
+      "Anna", "Petrova", "anna@example.com", "4000000000000001"));
+    User second = userRepository.save(TestEntities.userWithCards(
+      "Ivan", "Petrov", "ivan@example.com", "4000000000000002"));
+    flushAndClear();
+    Long firstCard = paymentCardRepository.findAllByUserId(first.getId()).get(0).getId();
+    Long secondCard = paymentCardRepository.findAllByUserId(second.getId()).get(0).getId();
+
+    assertAll(
+      () -> assertEquals(Optional.of(first.getId()),
+        paymentCardRepository.findUserIdById(firstCard)),
+      () -> assertEquals(Optional.of(second.getId()),
+        paymentCardRepository.findUserIdById(secondCard)),
+      () -> assertTrue(paymentCardRepository.findUserIdById(secondCard + 1000).isEmpty()));
   }
 
   @Test

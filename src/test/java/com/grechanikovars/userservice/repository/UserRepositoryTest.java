@@ -12,6 +12,7 @@ import com.grechanikovars.userservice.repository.specification.UserSpecification
 import jakarta.persistence.LockModeType;
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
@@ -50,6 +51,17 @@ class UserRepositoryTest extends AbstractRepositoryTest {
       () -> assertTrue(userRepository.findByEmail("anna@example.com").isPresent()),
       () -> assertTrue(userRepository.existsByEmail("anna@example.com")),
       () -> assertFalse(userRepository.existsByEmail("nobody@example.com")));
+  }
+
+  @Test
+  void findEmailByIdReadsTheStoredEmail() {
+    Long id = userRepository.save(TestEntities.user("Anna", "Petrova", "anna@example.com"))
+      .getId();
+    flushAndClear();
+
+    assertAll(
+      () -> assertEquals(Optional.of("anna@example.com"), userRepository.findEmailById(id)),
+      () -> assertTrue(userRepository.findEmailById(id + 1000).isEmpty()));
   }
 
   @Test

@@ -12,6 +12,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.core.AuthenticationException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -41,6 +43,12 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
   private static final String UNIQUE_CARDS_NUMBER = "uq_payment_cards_number";
 
   private static final String INTERNAL_ERROR_DETAIL = "An unexpected error occurred";
+
+  /** The detail of every 401: it never says why, so a missing and a wrong credential look alike. */
+  private static final String AUTHENTICATION_REQUIRED = "Authentication is required";
+
+  /** The detail of every 403. */
+  private static final String ACCESS_DENIED = "Access is denied";
 
   /** Maps "resource does not exist" exceptions to 404. */
   @ExceptionHandler({UserNotFoundException.class, PaymentCardNotFoundException.class})
@@ -82,6 +90,26 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     return internalError();
   }
 
+  /**
+   * Handles a caller that is not authenticated: 401 with a constant detail.
+   *
+   * <p>The exceptions of the filter chain get here through {@code ProblemDetailSecurityHandler};
+   * the message of the exception is never sent, because it may describe the token.
+   */
+  @ExceptionHandler(AuthenticationException.class)
+  public ResponseEntity<ProblemDetail> handleAuthentication(AuthenticationException ex) {
+    return reject(HttpStatus.UNAUTHORIZED, AUTHENTICATION_REQUIRED, ex);
+  }
+
+  /**
+   * Handles an authenticated caller that has no right to the resource: 403 with a constant
+   * detail. Without this handler the catch-all below would turn it into a 500.
+   */
+  @ExceptionHandler(AccessDeniedException.class)
+  public ResponseEntity<ProblemDetail> handleAccessDenied(AccessDeniedException ex) {
+    return reject(HttpStatus.FORBIDDEN, ACCESS_DENIED, ex);
+  }
+
   /** Last resort: logs the exception with its stack trace and hides the details from the client. */
   @ExceptionHandler(Exception.class)
   public ResponseEntity<ProblemDetail> handleUnexpected(Exception ex) {
@@ -113,6 +141,14 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     LOGGER.info("Request rejected with status {}: {}", status.value(), ex.getMessage());
     return ResponseEntity.status(status)
       .body(ProblemDetail.forStatusAndDetail(status, ex.getMessage()));
+  }
+
+  /** A security rejection: the detail is fixed, only the class of the exception is logged. */
+  private static ResponseEntity<ProblemDetail> reject(HttpStatus status, String detail,
+    Exception ex) {
+    LOGGER.info("Request rejected with status {}: {}", status.value(),
+      ex.getClass().getSimpleName());
+    return ResponseEntity.status(status).body(ProblemDetail.forStatusAndDetail(status, detail));
   }
 
   private static ResponseEntity<ProblemDetail> internalError() {
