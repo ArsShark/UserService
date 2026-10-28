@@ -39,6 +39,10 @@ app:
     jwt-issuer: ${JWT_ISSUER:authentication-service}
 server:
   port: ${SERVER_PORT:8082}
+  # The service is behind the API Gateway, which sends the real host and protocol of the client in
+  # the X-Forwarded-* headers (it removes the ones that a client sends itself). The links that
+  # the service builds (the Location of a created resource) use them.
+  forward-headers-strategy: framework
 logging:
   level:
     org.hibernate.orm.jdbc.error: ERROR
