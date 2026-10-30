@@ -92,7 +92,7 @@ class CardApiIntegrationTest extends AbstractIntegrationTest {
   }
 
   @Test
-  void userCanHaveAtMostFiveCards() throws Exception {
+  void userCanHaveAtMostFiveActiveCards() throws Exception {
     long ivan = createUser("Ivan", "Petrov", "ivan@example.com");
     long anna = createUser("Anna", "Smirnova", "anna@example.com");
     long firstCard = createCard(ivan, cardNumber(1));
@@ -107,7 +107,7 @@ class CardApiIntegrationTest extends AbstractIntegrationTest {
         status().isConflict(),
         problemJson(),
         jsonPath("$.detail").value(String.format(
-          "User with id %d already has the maximum of 5 payment cards", ivan)));
+          "User with id %d already has the maximum of 5 active payment cards", ivan)));
     assertEquals(5, cardsOf(ivan));
 
     // The limit is per user.
@@ -118,6 +118,62 @@ class CardApiIntegrationTest extends AbstractIntegrationTest {
     mockMvc.perform(delete("/api/cards/{id}", firstCard)).andExpect(status().isNoContent());
     createCard(ivan, cardNumber(6));
     assertEquals(5, cardsOf(ivan));
+  }
+
+  @Test
+  void deactivatedCardsDoNotCountTowardsTheLimit() throws Exception {
+    long ivan = createUser("Ivan", "Petrov", "ivan@example.com");
+    long firstCard = createCard(ivan, cardNumber(1));
+    long secondCard = createCard(ivan, cardNumber(2));
+    for (int index = 3; index <= 5; index++) {
+      createCard(ivan, cardNumber(index));
+    }
+    mockMvc.perform(patch("/api/cards/{id}/deactivate", firstCard)).andExpect(status().isOk());
+    mockMvc.perform(patch("/api/cards/{id}/deactivate", secondCard)).andExpect(status().isOk());
+
+    // Three active and two deactivated cards: two more active cards fit, the third does not.
+    createCard(ivan, cardNumber(6));
+    createCard(ivan, cardNumber(7));
+    mockMvc.perform(post("/api/users/{userId}/cards", ivan)
+        .contentType(MediaType.APPLICATION_JSON)
+        .content(cardJson(cardNumber(8), "IVAN PETROV", "2032-12-31")))
+      .andExpectAll(status().isConflict(), problemJson());
+
+    assertAll(
+      () -> assertEquals(7, cardsOf(ivan)),
+      () -> assertEquals(5, activeCardsOf(ivan)));
+  }
+
+  @Test
+  void activationIsRejectedWhenItWouldExceedTheLimit() throws Exception {
+    long ivan = createUser("Ivan", "Petrov", "ivan@example.com");
+    long firstCard = createCard(ivan, cardNumber(1));
+    long secondCard = createCard(ivan, cardNumber(2));
+    for (int index = 3; index <= 5; index++) {
+      createCard(ivan, cardNumber(index));
+    }
+    mockMvc.perform(patch("/api/cards/{id}/deactivate", firstCard)).andExpect(status().isOk());
+    createCard(ivan, cardNumber(6));
+
+    // Five active cards again: the deactivated one cannot come back.
+    mockMvc.perform(patch("/api/cards/{id}/activate", firstCard))
+      .andExpectAll(
+        status().isConflict(),
+        problemJson(),
+        jsonPath("$.detail").value(String.format(
+          "User with id %d already has the maximum of 5 active payment cards", ivan)));
+    assertEquals(5, activeCardsOf(ivan));
+
+    // Repeating the activation of a card that is already active never fails.
+    mockMvc.perform(patch("/api/cards/{id}/activate", secondCard))
+      .andExpectAll(status().isOk(), jsonPath("$.active").value(true));
+
+    // After one more deactivation there is a free slot.
+    mockMvc.perform(patch("/api/cards/{id}/deactivate", secondCard))
+      .andExpect(status().isOk());
+    mockMvc.perform(patch("/api/cards/{id}/activate", firstCard))
+      .andExpectAll(status().isOk(), jsonPath("$.active").value(true));
+    assertEquals(5, activeCardsOf(ivan));
   }
 
   @Test
@@ -214,6 +270,12 @@ class CardApiIntegrationTest extends AbstractIntegrationTest {
   private String storedNumber(long cardId) {
     return jdbcTemplate.queryForObject(
       "SELECT number FROM payment_cards WHERE id = ?", String.class, cardId);
+  }
+
+  private long activeCardsOf(long userId) {
+    Long count = jdbcTemplate.queryForObject(
+      "SELECT count(*) FROM payment_cards WHERE user_id = ? AND active", Long.class, userId);
+    return count == null ? 0 : count;
   }
 
   private long cardsOf(long userId) {

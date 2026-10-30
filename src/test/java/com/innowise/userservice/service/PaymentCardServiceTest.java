@@ -8,6 +8,7 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
@@ -96,8 +97,8 @@ class PaymentCardServiceTest {
     PaymentCard saved = detachedCard(CARD_ID);
     CardResponse expected = response(CARD_ID);
     when(userRepository.findByIdForUpdate(USER_ID)).thenReturn(Optional.of(owner));
-    // Four cards is the highest count that still allows one more.
-    when(paymentCardRepository.countByUserId(USER_ID)).thenReturn(4L);
+    // Four active cards is the highest count that still allows one more.
+    when(paymentCardRepository.countByUserIdAndActiveTrue(USER_ID)).thenReturn(4L);
     when(paymentCardRepository.existsByNumber(NUMBER)).thenReturn(false);
     when(paymentCardMapper.toEntity(request)).thenReturn(mapped);
     when(paymentCardRepository.save(mapped)).thenReturn(saved);
@@ -112,16 +113,16 @@ class PaymentCardServiceTest {
       () -> assertTrue(owner.getCards().contains(mapped)),
       // The lock has to come before the count, otherwise two requests can both pass the limit.
       () -> order.verify(userRepository).findByIdForUpdate(USER_ID),
-      () -> order.verify(paymentCardRepository).countByUserId(USER_ID),
+      () -> order.verify(paymentCardRepository).countByUserIdAndActiveTrue(USER_ID),
       () -> order.verify(paymentCardRepository).save(mapped),
       () -> order.verify(userCacheEvictor).evict(USER_ID));
   }
 
   @ParameterizedTest
   @ValueSource(longs = {5, 6})
-  void createRejectsUserWithMaximumNumberOfCards(long cardCount) {
+  void createRejectsUserWithMaximumNumberOfActiveCards(long cardCount) {
     when(userRepository.findByIdForUpdate(USER_ID)).thenReturn(Optional.of(user(USER_ID)));
-    when(paymentCardRepository.countByUserId(USER_ID)).thenReturn(cardCount);
+    when(paymentCardRepository.countByUserIdAndActiveTrue(USER_ID)).thenReturn(cardCount);
 
     assertThrows(CardLimitExceededException.class,
       () -> paymentCardService.create(USER_ID, request(NUMBER)));
@@ -144,7 +145,7 @@ class PaymentCardServiceTest {
   @Test
   void createRejectsNumberThatIsAlreadyRegistered() {
     when(userRepository.findByIdForUpdate(USER_ID)).thenReturn(Optional.of(user(USER_ID)));
-    when(paymentCardRepository.countByUserId(USER_ID)).thenReturn(2L);
+    when(paymentCardRepository.countByUserIdAndActiveTrue(USER_ID)).thenReturn(2L);
     when(paymentCardRepository.existsByNumber(NUMBER)).thenReturn(true);
 
     assertThrows(CardNumberAlreadyExistsException.class,
@@ -297,32 +298,110 @@ class PaymentCardServiceTest {
       () -> verifyNoInteractions(userCacheEvictor));
   }
 
-  @ParameterizedTest
-  @ValueSource(booleans = {true, false})
-  void setActiveUpdatesTheFlagReadsTheCardAndEvictsItsOwner(boolean active) {
+  @Test
+  void deactivateUpdatesTheFlagReadsTheCardAndEvictsItsOwnerWithoutLocking() {
     PaymentCard reloaded = card(CARD_ID, user(USER_ID), NUMBER);
     CardResponse expected = response(CARD_ID);
-    when(paymentCardRepository.updateActiveById(CARD_ID, active, NOW)).thenReturn(1);
+    when(paymentCardRepository.updateActiveById(CARD_ID, false, NOW)).thenReturn(1);
     when(paymentCardRepository.findById(CARD_ID)).thenReturn(Optional.of(reloaded));
     when(paymentCardMapper.toResponse(reloaded)).thenReturn(expected);
 
-    CardResponse actual = paymentCardService.setActive(CARD_ID, active);
+    CardResponse actual = paymentCardService.setActive(CARD_ID, false);
 
     // The bulk update bypasses the persistence context, so the read has to come after it.
     InOrder order = inOrder(paymentCardRepository, userCacheEvictor);
     assertAll(
       () -> assertSame(expected, actual),
-      () -> order.verify(paymentCardRepository).updateActiveById(CARD_ID, active, NOW),
+      () -> order.verify(paymentCardRepository).updateActiveById(CARD_ID, false, NOW),
       () -> order.verify(paymentCardRepository).findById(CARD_ID),
+      () -> order.verify(userCacheEvictor).evict(USER_ID),
+      // A deactivation never raises the number of active cards, so it needs no lock.
+      () -> verifyNoInteractions(userRepository),
+      () -> verify(paymentCardRepository, never()).countByUserIdAndActiveTrue(any()));
+  }
+
+  @Test
+  void activateLocksOwnerChecksLimitAndThenUpdatesTheFlag() {
+    User owner = user(USER_ID);
+    PaymentCard inactive = card(CARD_ID, owner, NUMBER);
+    inactive.setActive(false);
+    CardResponse expected = response(CARD_ID);
+    when(paymentCardRepository.findUserIdById(CARD_ID)).thenReturn(Optional.of(USER_ID));
+    when(userRepository.findByIdForUpdate(USER_ID)).thenReturn(Optional.of(owner));
+    when(paymentCardRepository.findById(CARD_ID)).thenReturn(Optional.of(inactive));
+    // Four active cards is the highest count that still allows one more.
+    when(paymentCardRepository.countByUserIdAndActiveTrue(USER_ID)).thenReturn(4L);
+    when(paymentCardRepository.updateActiveById(CARD_ID, true, NOW)).thenReturn(1);
+    when(paymentCardMapper.toResponse(inactive)).thenReturn(expected);
+
+    CardResponse actual = paymentCardService.setActive(CARD_ID, true);
+
+    InOrder order = inOrder(userRepository, paymentCardRepository, userCacheEvictor);
+    assertAll(
+      () -> assertSame(expected, actual),
+      // The lock has to come before the count, otherwise two requests can both pass the limit.
+      () -> order.verify(userRepository).findByIdForUpdate(USER_ID),
+      () -> order.verify(paymentCardRepository).countByUserIdAndActiveTrue(USER_ID),
+      () -> order.verify(paymentCardRepository).updateActiveById(CARD_ID, true, NOW),
       () -> order.verify(userCacheEvictor).evict(USER_ID));
+  }
+
+  @ParameterizedTest
+  @ValueSource(longs = {5, 6})
+  void activateRejectsOwnerWithMaximumNumberOfActiveCards(long activeCards) {
+    User owner = user(USER_ID);
+    PaymentCard inactive = card(CARD_ID, owner, NUMBER);
+    inactive.setActive(false);
+    when(paymentCardRepository.findUserIdById(CARD_ID)).thenReturn(Optional.of(USER_ID));
+    when(userRepository.findByIdForUpdate(USER_ID)).thenReturn(Optional.of(owner));
+    when(paymentCardRepository.findById(CARD_ID)).thenReturn(Optional.of(inactive));
+    when(paymentCardRepository.countByUserIdAndActiveTrue(USER_ID)).thenReturn(activeCards);
+
+    assertThrows(CardLimitExceededException.class,
+      () -> paymentCardService.setActive(CARD_ID, true));
+
+    assertAll(
+      () -> verify(paymentCardRepository, never()).updateActiveById(any(), anyBoolean(), any()),
+      () -> verifyNoInteractions(paymentCardMapper, userCacheEvictor));
+  }
+
+  @Test
+  void activateOfAnAlreadyActiveCardSkipsTheLimitCheck() {
+    User owner = user(USER_ID);
+    PaymentCard active = card(CARD_ID, owner, NUMBER);
+    CardResponse expected = response(CARD_ID);
+    when(paymentCardRepository.findUserIdById(CARD_ID)).thenReturn(Optional.of(USER_ID));
+    when(userRepository.findByIdForUpdate(USER_ID)).thenReturn(Optional.of(owner));
+    when(paymentCardRepository.findById(CARD_ID)).thenReturn(Optional.of(active));
+    when(paymentCardRepository.updateActiveById(CARD_ID, true, NOW)).thenReturn(1);
+    when(paymentCardMapper.toResponse(active)).thenReturn(expected);
+
+    CardResponse actual = paymentCardService.setActive(CARD_ID, true);
+
+    // The card is already one of the active cards, so repeating the call must never fail.
+    assertAll(
+      () -> assertSame(expected, actual),
+      () -> verify(paymentCardRepository, never()).countByUserIdAndActiveTrue(any()));
+  }
+
+  @Test
+  void activateRejectsUnknownCardBeforeLocking() {
+    when(paymentCardRepository.findUserIdById(CARD_ID)).thenReturn(Optional.empty());
+
+    assertThrows(PaymentCardNotFoundException.class,
+      () -> paymentCardService.setActive(CARD_ID, true));
+
+    assertAll(
+      () -> verifyNoInteractions(userRepository, paymentCardMapper, userCacheEvictor),
+      () -> verify(paymentCardRepository, never()).updateActiveById(any(), anyBoolean(), any()));
   }
 
   @Test
   void setActiveRejectsUnknownCard() {
-    when(paymentCardRepository.updateActiveById(CARD_ID, true, NOW)).thenReturn(0);
+    when(paymentCardRepository.updateActiveById(CARD_ID, false, NOW)).thenReturn(0);
 
     assertThrows(PaymentCardNotFoundException.class,
-      () -> paymentCardService.setActive(CARD_ID, true));
+      () -> paymentCardService.setActive(CARD_ID, false));
 
     assertAll(
       () -> verify(paymentCardRepository, never()).findById(any()),

@@ -2,6 +2,7 @@ package com.innowise.userservice.integration;
 
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 
 import java.util.ArrayList;
@@ -28,6 +29,7 @@ import org.springframework.http.MediaType;
  */
 class CardConcurrencyIntegrationTest extends AbstractIntegrationTest {
 
+  private static final int OK = 200;
   private static final int CREATED = 201;
   private static final int CONFLICT = 409;
 
@@ -51,6 +53,34 @@ class CardConcurrencyIntegrationTest extends AbstractIntegrationTest {
       () -> assertEquals(7, Collections.frequency(statuses, CONFLICT),
         "all other requests must be rejected with 409"),
       () -> assertEquals(5, cardsOf(userId)));
+  }
+
+  @RepeatedTest(5)
+  void parallelActivationsNeverExceedTheLimitOfFiveActiveCards() throws Exception {
+    long userId = createUser("Ivan", "Petrov", "ivan@example.com");
+    List<Long> cards = new ArrayList<>();
+    for (int index = 1; index <= 5; index++) {
+      cards.add(createCard(userId, cardNumber(index)));
+    }
+    // Three deactivated cards make room for two new active ones: four active, three inactive.
+    for (int index = 2; index < 5; index++) {
+      deactivate(cards.get(index));
+    }
+    createCard(userId, cardNumber(6));
+    createCard(userId, cardNumber(7));
+    List<Callable<Integer>> requests = new ArrayList<>();
+    for (int index = 2; index < 5; index++) {
+      requests.add(activateCard(cards.get(index)));
+    }
+
+    List<Integer> statuses = runTogether(requests);
+
+    assertAll(
+      () -> assertEquals(1, Collections.frequency(statuses, OK),
+        "exactly one activation must get the last free slot"),
+      () -> assertEquals(2, Collections.frequency(statuses, CONFLICT),
+        "the other activations must be rejected with 409"),
+      () -> assertEquals(5, activeCardsOf(userId)));
   }
 
   @RepeatedTest(5)
@@ -81,6 +111,22 @@ class CardConcurrencyIntegrationTest extends AbstractIntegrationTest {
       .getStatus();
   }
 
+  /** A request that activates a card and returns the HTTP status of the answer. */
+  private Callable<Integer> activateCard(long cardId) {
+    return () -> mockMvc.perform(patch("/api/cards/{id}/activate", cardId))
+      .andReturn()
+      .getResponse()
+      .getStatus();
+  }
+
+  private void deactivate(long cardId) throws Exception {
+    int status = mockMvc.perform(patch("/api/cards/{id}/deactivate", cardId))
+      .andReturn()
+      .getResponse()
+      .getStatus();
+    assertEquals(OK, status);
+  }
+
   /** Runs the tasks on separate threads, starts them at the same moment and collects results. */
   private List<Integer> runTogether(List<Callable<Integer>> tasks) throws Exception {
     ExecutorService executor = Executors.newFixedThreadPool(tasks.size());
@@ -101,6 +147,12 @@ class CardConcurrencyIntegrationTest extends AbstractIntegrationTest {
     } finally {
       executor.shutdownNow();
     }
+  }
+
+  private long activeCardsOf(long userId) {
+    Long count = jdbcTemplate.queryForObject(
+      "SELECT count(*) FROM payment_cards WHERE user_id = ? AND active", Long.class, userId);
+    return count == null ? 0 : count;
   }
 
   private long cardsOf(long userId) {

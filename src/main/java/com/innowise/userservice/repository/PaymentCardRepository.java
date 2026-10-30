@@ -35,12 +35,21 @@ public interface PaymentCardRepository extends JpaRepository<PaymentCard, Long>,
   Optional<Long> findUserIdById(@Param("id") Long id);
 
   /**
-   * Counts the cards of a user. Used by the service layer to enforce the limit of 5 cards.
+   * Counts all cards of a user, active or not.
    *
    * @param userId owner id
    * @return number of cards of the user
    */
   long countByUserId(Long userId);
+
+  /**
+   * Counts the active cards of a user. Used by the service layer to enforce the limit of
+   * 5 active cards.
+   *
+   * @param userId owner id
+   * @return number of active cards of the user
+   */
+  long countByUserIdAndActiveTrue(Long userId);
 
   /**
    * Checks whether a card with the given number exists.

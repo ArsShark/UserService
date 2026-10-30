@@ -37,8 +37,8 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional(readOnly = true)
 public class PaymentCardService {
 
-  /** The maximum number of cards one user may own. */
-  private static final int MAX_CARDS_PER_USER = 5;
+  /** The maximum number of active cards one user may own. */
+  private static final int MAX_ACTIVE_CARDS_PER_USER = 5;
 
   private static final Logger LOGGER = LoggerFactory.getLogger(PaymentCardService.class);
 
@@ -65,22 +65,24 @@ public class PaymentCardService {
    * Creates an active card for a user.
    *
    * <p>The owner row is locked first, so two concurrent requests for the same user cannot both
-   * pass the limit check. The lock is released when the transaction ends.
+   * pass the limit check. The lock is released when the transaction ends. Only active cards
+   * count towards the limit.
    * <p>Evicts the owner of the card from the user cache.
    *
    * @param userId owner id
    * @param request card data
    * @return the created card
    * @throws UserNotFoundException if there is no such user
-   * @throws CardLimitExceededException if the user already has the maximum number of cards
+   * @throws CardLimitExceededException if the user already has the maximum number of active
+   *     cards
    * @throws CardNumberAlreadyExistsException if the number is already registered
    */
   @Transactional
   public CardResponse create(Long userId, CardRequest request) {
     User owner = userRepository.findByIdForUpdate(userId)
       .orElseThrow(() -> new UserNotFoundException(userId));
-    if (paymentCardRepository.countByUserId(userId) >= MAX_CARDS_PER_USER) {
-      throw new CardLimitExceededException(userId, MAX_CARDS_PER_USER);
+    if (paymentCardRepository.countByUserIdAndActiveTrue(userId) >= MAX_ACTIVE_CARDS_PER_USER) {
+      throw new CardLimitExceededException(userId, MAX_ACTIVE_CARDS_PER_USER);
     }
     if (paymentCardRepository.existsByNumber(request.number())) {
       throw new CardNumberAlreadyExistsException();
@@ -166,15 +168,23 @@ public class PaymentCardService {
 
   /**
    * Activates or deactivates a card.
+   *
+   * <p>Activating an inactive card adds one to the active cards of its owner, so it is checked
+   * against the same limit as {@link #create} and under the same lock on the owner row.
+   * Activating a card that is already active, and any deactivation, need no check.
    * <p>Evicts the owner of the card from the user cache.
    *
    * @param id card id
    * @param active the new value of the flag
    * @return the card after the change
    * @throws PaymentCardNotFoundException if there is no such card
+   * @throws CardLimitExceededException if the card would be the sixth active card of its owner
    */
   @Transactional
   public CardResponse setActive(Long id, boolean active) {
+    if (active) {
+      checkActivationLimit(id);
+    }
     int updatedRows = paymentCardRepository.updateActiveById(id, active, Instant.now(clock));
     if (updatedRows == 0) {
       throw new PaymentCardNotFoundException(id);
@@ -201,6 +211,23 @@ public class PaymentCardService {
     paymentCardRepository.delete(card);
     userCacheEvictor.evict(ownerId);
     LOGGER.info("Deleted payment card with id {}", id);
+  }
+
+  /**
+   * Locks the owner of the card and rejects the activation if it would exceed the limit. The
+   * card is read after the lock, so a concurrent change of its flag is seen.
+   */
+  private void checkActivationLimit(Long cardId) {
+    Long ownerId = paymentCardRepository.findUserIdById(cardId)
+      .orElseThrow(() -> new PaymentCardNotFoundException(cardId));
+    // An owner that vanishes between the two reads means the card is gone as well.
+    userRepository.findByIdForUpdate(ownerId)
+      .orElseThrow(() -> new PaymentCardNotFoundException(cardId));
+    PaymentCard card = getCardOrThrow(cardId);
+    if (!card.isActive()
+      && paymentCardRepository.countByUserIdAndActiveTrue(ownerId) >= MAX_ACTIVE_CARDS_PER_USER) {
+      throw new CardLimitExceededException(ownerId, MAX_ACTIVE_CARDS_PER_USER);
+    }
   }
 
   private PaymentCard getCardOrThrow(Long id) {

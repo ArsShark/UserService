@@ -66,7 +66,7 @@ public class PaymentCardController {
     return ResponseEntity.created(location).body(created);
   }
 
-  /** Returns all cards of a user. A user has at most five, so the list is not paged. */
+  /** Returns all cards of a user, active or not. The list is not paged: users have few cards. */
   @PreAuthorize(AccessRules.OWN_USER_BY_USER_ID)
   @GetMapping("/users/{userId}/cards")
   public ResponseEntity<List<CardResponse>> getAllByUserId(@PathVariable Long userId) {

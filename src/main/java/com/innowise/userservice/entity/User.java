@@ -17,8 +17,8 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 /**
- * Application user. A user owns payment cards; the limit of 5 cards is enforced in the
- * service layer.
+ * Application user. A user owns payment cards; the limit of 5 active cards is enforced in the
+ * service layer. Deactivated cards do not count towards the limit.
  */
 
 @Entity

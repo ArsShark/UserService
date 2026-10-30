@@ -76,6 +76,21 @@ class PaymentCardRepositoryTest extends AbstractRepositoryTest {
   }
 
   @Test
+  void countByUserIdAndActiveTrueIgnoresDeactivatedCardsAndOtherUsers() {
+    User user = userRepository.save(TestEntities.userWithCards(
+      "Anna", "Petrova", "anna@example.com",
+      "4000000000000001", "4000000000000002", "4000000000000003"));
+    userRepository.save(TestEntities.userWithCards(
+      "Ivan", "Petrov", "ivan@example.com", "4000000000000004"));
+    user.getCards().get(0).setActive(false);
+    userRepository.saveAndFlush(user);
+
+    assertAll(
+      () -> assertEquals(3, paymentCardRepository.countByUserId(user.getId())),
+      () -> assertEquals(2, paymentCardRepository.countByUserIdAndActiveTrue(user.getId())));
+  }
+
+  @Test
   void duplicateNumberViolatesUniqueConstraint() {
     userRepository.save(TestEntities.userWithCards(
       "Anna", "Petrova", "anna@example.com", "4000000000000001"));
