@@ -15,8 +15,8 @@ import com.innowise.userservice.repository.specification.PaymentCardSpecificatio
 import java.time.Clock;
 import java.time.Instant;
 import java.util.List;
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -40,7 +40,7 @@ public class PaymentCardService {
   /** The maximum number of cards one user may own. */
   private static final int MAX_CARDS_PER_USER = 5;
 
-  private static final Logger LOGGER = LogManager.getLogger(PaymentCardService.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(PaymentCardService.class);
 
   private final PaymentCardRepository paymentCardRepository;
   private final UserRepository userRepository;

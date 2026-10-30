@@ -3,9 +3,9 @@ package com.innowise.userservice.exception;
 import com.innowise.userservice.dto.response.FieldViolation;
 import java.util.Comparator;
 import java.util.List;
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
 import org.hibernate.exception.ConstraintViolationException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -34,7 +34,7 @@ import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExcep
 @RestControllerAdvice
 public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 
-  private static final Logger LOGGER = LogManager.getLogger(GlobalExceptionHandler.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
   /** Name of the UNIQUE constraint on {@code users.email} (Liquibase changelog 001). */
   private static final String UNIQUE_USERS_EMAIL = "uq_users_email";

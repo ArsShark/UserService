@@ -1,7 +1,7 @@
 package com.innowise.userservice.security;
 
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.security.oauth2.jwt.BadJwtException;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
@@ -28,7 +28,7 @@ public final class FailClosedJwtDecoder implements JwtDecoder {
   /** The message of the exception for a token that could not be checked; it is a constant. */
   public static final String MESSAGE = "The token could not be verified";
 
-  private static final Logger LOGGER = LogManager.getLogger(FailClosedJwtDecoder.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(FailClosedJwtDecoder.class);
 
   private final JwtDecoder delegate;
 
