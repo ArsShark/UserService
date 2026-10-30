@@ -87,7 +87,7 @@ reads from `AUTH_JWKS_URI`.
 | `POST /api/users`, `GET /api/users` | yes | no | no |
 | `GET /api/users/{id}` | yes | own profile | no |
 | `PUT /api/users/{id}` | yes | own profile, **the email cannot be changed** | no |
-| `PATCH /api/users/{id}/activate`, `/deactivate`, `DELETE /api/users/{id}` | yes | no | no |
+| `PATCH /api/users/{id}/status`, `DELETE /api/users/{id}` | yes | no | no |
 | `POST`, `GET /api/users/{userId}/cards` | yes | own cards | no |
 | `GET /api/cards` | yes | no | no |
 | `GET`, `PUT`, `DELETE /api/cards/{id}`, `PATCH /api/cards/{id}/deactivate` | yes | own cards | no |
@@ -199,7 +199,7 @@ Run the folders top to bottom with the Collection Runner:
 | Folder | What it checks |
 |--------|----------------|
 | `0. Authentication` | login as the admin; the token is kept in `accessToken` and sent by every request |
-| `1.` to `4.` | users and cards as the admin: happy path, validation and errors, the limit of 5 cards, delete and cascade |
+| `1.` to `4.` | users and cards as the admin: happy path, validation and errors, the limit of 5 active cards, delete and cascade |
 | `5. Access control` | a user created through the internal endpoints: his own resources work, somebody else's are 403 or 404, admin-only endpoints are 403, bad tokens and a refresh token are 401, the internal key and its rollback |
 
 Every run uses unique data and removes the profiles it created. The Authentication Service keeps

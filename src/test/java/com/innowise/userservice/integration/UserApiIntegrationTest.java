@@ -52,7 +52,7 @@ class UserApiIntegrationTest extends AbstractIntegrationTest {
 
     // Deactivation is a bulk update that bypasses JPA Auditing, so the service sets updatedAt.
     clock.advance(Duration.ofHours(1));
-    mockMvc.perform(patch("/api/users/{id}/deactivate", id))
+    mockMvc.perform(userStatus(id, false))
       .andExpectAll(
         status().isOk(),
         jsonPath("$.active").value(false),
@@ -60,7 +60,7 @@ class UserApiIntegrationTest extends AbstractIntegrationTest {
         jsonPath("$.updatedAt").value(hoursAfterStart(2)));
 
     clock.advance(Duration.ofHours(1));
-    mockMvc.perform(patch("/api/users/{id}/activate", id))
+    mockMvc.perform(userStatus(id, true))
       .andExpectAll(
         status().isOk(),
         jsonPath("$.active").value(true),
@@ -111,14 +111,14 @@ class UserApiIntegrationTest extends AbstractIntegrationTest {
     long firstCard = createCard(userId, cardNumber(1));
     long secondCard = createCard(userId, cardNumber(2));
 
-    mockMvc.perform(patch("/api/users/{id}/deactivate", userId)).andExpect(status().isOk());
+    mockMvc.perform(userStatus(userId, false)).andExpect(status().isOk());
     mockMvc.perform(get("/api/users/{id}", userId))
       .andExpectAll(
         status().isOk(),
         jsonPath("$.active").value(false),
         jsonPath("$.cards[?(@.active == true)]").value(hasSize(2)));
 
-    mockMvc.perform(patch("/api/users/{id}/activate", userId)).andExpect(status().isOk());
+    mockMvc.perform(userStatus(userId, true)).andExpect(status().isOk());
     mockMvc.perform(patch("/api/cards/{id}/deactivate", firstCard)).andExpect(status().isOk());
     mockMvc.perform(get("/api/users/{id}", userId))
       .andExpectAll(

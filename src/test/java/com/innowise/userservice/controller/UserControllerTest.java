@@ -36,7 +36,7 @@ import java.time.LocalDate;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.security.autoconfigure.UserDetailsServiceAutoConfiguration;
@@ -267,16 +267,55 @@ class UserControllerTest {
   }
 
   @ParameterizedTest
-  @CsvSource({"activate, true", "deactivate, false"})
-  void setActiveUsesTheMatchingFlag(String action, boolean active) throws Exception {
+  @ValueSource(booleans = {true, false})
+  void setStatusUsesTheFlagOfTheBody(boolean active) throws Exception {
     when(userService.setActive(5L, active)).thenReturn(user(5, active));
 
-    mockMvc.perform(patch("/api/users/5/{action}", action)).andExpectAll(
-      status().isOk(),
-      jsonPath("$.id").value(5),
-      jsonPath("$.active").value(active));
+    mockMvc.perform(patch("/api/users/5/status")
+        .contentType(MediaType.APPLICATION_JSON)
+        .content(String.format("{\"active\": %b}", active)))
+      .andExpectAll(
+        status().isOk(),
+        jsonPath("$.id").value(5),
+        jsonPath("$.active").value(active));
 
     verify(userService).setActive(5L, active);
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"{}", "{\"active\": null}"})
+  void setStatusRejectsABodyWithoutTheFlag(String body) throws Exception {
+    mockMvc.perform(patch("/api/users/5/status")
+        .contentType(MediaType.APPLICATION_JSON)
+        .content(body))
+      .andExpectAll(
+        status().isBadRequest(),
+        jsonPath("$.errors.length()").value(1),
+        jsonPath("$.errors[0].field").value("active"));
+
+    verifyNoInteractions(userService);
+  }
+
+  @Test
+  void setStatusRejectsAFlagThatIsNotABoolean() throws Exception {
+    mockMvc.perform(patch("/api/users/5/status")
+        .contentType(MediaType.APPLICATION_JSON)
+        .content("{\"active\": \"maybe\"}"))
+      .andExpect(status().isBadRequest());
+
+    verifyNoInteractions(userService);
+  }
+
+  @Test
+  void setStatusAnswers404ForUnknownUser() throws Exception {
+    when(userService.setActive(99L, false)).thenThrow(new UserNotFoundException(99L));
+
+    mockMvc.perform(patch("/api/users/99/status")
+        .contentType(MediaType.APPLICATION_JSON)
+        .content("{\"active\": false}"))
+      .andExpectAll(
+        status().isNotFound(),
+        jsonPath("$.detail").value("User with id 99 not found"));
   }
 
   @Test

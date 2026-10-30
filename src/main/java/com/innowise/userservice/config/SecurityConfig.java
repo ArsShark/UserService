@@ -108,8 +108,7 @@ public class SecurityConfig {
             // Users: the list and every change of the whole user are for an admin only.
             .requestMatchers(HttpMethod.POST, "/api/users").hasRole(ADMIN)
             .requestMatchers(HttpMethod.GET, "/api/users").hasRole(ADMIN)
-            .requestMatchers(HttpMethod.PATCH,
-                "/api/users/*/activate", "/api/users/*/deactivate").hasRole(ADMIN)
+            .requestMatchers(HttpMethod.PATCH, "/api/users/*/status").hasRole(ADMIN)
             .requestMatchers(HttpMethod.DELETE, "/api/users/*").hasRole(ADMIN)
             // Own profile: a user reads and replaces his own.
             .requestMatchers(HttpMethod.GET, "/api/users/*").hasAnyRole(ADMIN, USER)

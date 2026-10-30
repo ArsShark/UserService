@@ -141,7 +141,7 @@ class UserCacheIntegrationTest extends AbstractIntegrationTest {
     mockMvc.perform(delete("/api/cards/{id}", card)).andExpect(status().isNoContent());
     getUser(userId).andExpect(jsonPath("$.cards", hasSize(1)));
 
-    mockMvc.perform(patch("/api/users/{id}/deactivate", userId)).andExpect(status().isOk());
+    mockMvc.perform(userStatus(userId, false)).andExpect(status().isOk());
     getUser(userId).andExpect(jsonPath("$.active").value(false));
   }
 
@@ -192,8 +192,8 @@ class UserCacheIntegrationTest extends AbstractIntegrationTest {
       case "update user" -> mockMvc.perform(put("/api/users/{id}", userId)
         .contentType(MediaType.APPLICATION_JSON)
         .content(userJson("Ivan", "Sidorov", "ivan@example.com")));
-      case "deactivate user" -> mockMvc.perform(patch("/api/users/{id}/deactivate", userId));
-      case "activate user" -> mockMvc.perform(patch("/api/users/{id}/activate", userId));
+      case "deactivate user" -> mockMvc.perform(userStatus(userId, false));
+      case "activate user" -> mockMvc.perform(userStatus(userId, true));
       case "delete user" -> mockMvc.perform(delete("/api/users/{id}", userId));
       case "create card" -> mockMvc.perform(post("/api/users/{userId}/cards", userId)
         .contentType(MediaType.APPLICATION_JSON)

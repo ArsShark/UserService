@@ -147,9 +147,9 @@ class OwnershipIntegrationTest extends AbstractIntegrationTest {
   void aUserCannotUseTheOperationsOfAnAdmin() throws Exception {
     perform(as(get("/api/users"), annaToken)).andExpect(status().isForbidden());
     perform(as(get("/api/cards"), annaToken)).andExpect(status().isForbidden());
-    perform(as(patch("/api/users/{id}/deactivate", annaId), annaToken))
+    perform(as(userStatus(annaId, false), annaToken))
         .andExpect(status().isForbidden());
-    perform(as(patch("/api/users/{id}/activate", annaId), annaToken))
+    perform(as(userStatus(annaId, true), annaToken))
         .andExpect(status().isForbidden());
     perform(as(delete("/api/users/{id}", annaId), annaToken)).andExpect(status().isForbidden());
 
@@ -240,6 +240,6 @@ class OwnershipIntegrationTest extends AbstractIntegrationTest {
     perform(get("/api/users/{id}", annaId)).andExpect(status().isOk());
     perform(get("/api/users/{id}/cards", ivanId)).andExpect(status().isOk());
     perform(get("/api/cards/{id}", annaCardId)).andExpect(status().isOk());
-    perform(patch("/api/users/{id}/deactivate", annaId)).andExpect(status().isOk());
+    perform(userStatus(annaId, false)).andExpect(status().isOk());
   }
 }

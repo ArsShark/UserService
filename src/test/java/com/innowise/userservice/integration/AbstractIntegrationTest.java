@@ -1,6 +1,7 @@
 package com.innowise.userservice.integration;
 
 import static org.hamcrest.Matchers.contains;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -35,6 +36,7 @@ import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.ResultMatcher;
+import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 
 /**
  * Base class of the integration tests: the whole application on real PostgreSQL and Redis
@@ -165,6 +167,13 @@ abstract class AbstractIntegrationTest {
       .andExpect(status().isCreated())
       .andReturn();
     return idOf(result);
+  }
+
+  /** A request that sets the active flag of a user through the status endpoint. */
+  protected static MockHttpServletRequestBuilder userStatus(long userId, boolean active) {
+    return patch("/api/users/{id}/status", userId)
+      .contentType(MediaType.APPLICATION_JSON)
+      .content(String.format("{\"active\": %b}", active));
   }
 
   /** JSON body of a user request. */

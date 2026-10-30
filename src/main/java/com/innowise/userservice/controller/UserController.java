@@ -1,6 +1,7 @@
 package com.innowise.userservice.controller;
 
 import com.innowise.userservice.dto.request.UserRequest;
+import com.innowise.userservice.dto.request.UserStatusRequest;
 import com.innowise.userservice.dto.response.PageResponse;
 import com.innowise.userservice.dto.response.UserResponse;
 import com.innowise.userservice.dto.response.UserWithCardsResponse;
@@ -89,16 +90,15 @@ public class UserController {
     return ResponseEntity.ok(userService.update(id, request));
   }
 
-  /** Activates a user. Repeating the call has no further effect. */
-  @PatchMapping("/{id}/activate")
-  public ResponseEntity<UserResponse> activate(@PathVariable Long id) {
-    return ResponseEntity.ok(userService.setActive(id, true));
-  }
-
-  /** Deactivates a user. Repeating the call has no further effect. */
-  @PatchMapping("/{id}/deactivate")
-  public ResponseEntity<UserResponse> deactivate(@PathVariable Long id) {
-    return ResponseEntity.ok(userService.setActive(id, false));
+  /**
+   * Activates or deactivates a user, depending on the {@code active} field of the body. Repeating
+   * the call has no further effect. The cards keep their own flags.
+   */
+  @PreAuthorize(AccessRules.ADMIN_ONLY)
+  @PatchMapping("/{id}/status")
+  public ResponseEntity<UserResponse> setStatus(
+    @PathVariable Long id, @Valid @RequestBody UserStatusRequest request) {
+    return ResponseEntity.ok(userService.setActive(id, request.active()));
   }
 
   /** Deletes a user together with the user's cards. */

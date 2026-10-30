@@ -112,8 +112,7 @@ class SecurityConfigTest {
         Arguments.of("GET", "/api/users"),
         Arguments.of("GET", "/api/users/1"),
         Arguments.of("PUT", "/api/users/1"),
-        Arguments.of("PATCH", "/api/users/1/activate"),
-        Arguments.of("PATCH", "/api/users/1/deactivate"),
+        Arguments.of("PATCH", "/api/users/1/status"),
         Arguments.of("DELETE", "/api/users/1"),
         Arguments.of("POST", "/api/users/1/cards"),
         Arguments.of("GET", "/api/users/1/cards"),
@@ -163,8 +162,7 @@ class SecurityConfigTest {
     return Stream.of(
         Arguments.of("POST", "/api/users"),
         Arguments.of("GET", "/api/users"),
-        Arguments.of("PATCH", "/api/users/7/activate"),
-        Arguments.of("PATCH", "/api/users/7/deactivate"),
+        Arguments.of("PATCH", "/api/users/7/status"),
         Arguments.of("DELETE", "/api/users/7"),
         Arguments.of("GET", "/api/cards"),
         Arguments.of("PATCH", "/api/cards/1/activate"));

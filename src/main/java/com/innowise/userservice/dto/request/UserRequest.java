@@ -11,7 +11,7 @@ import java.time.LocalDate;
  * Payload for creating a user or fully replacing an existing one.
  *
  * <p>Size limits mirror the column lengths of the {@code users} table. A new user is always
- * created active; the flag is changed only through a dedicated activate/deactivate operation.
+ * created active; the flag is changed only through the dedicated status operation.
  * The email is normalized (stripped and lower-cased) in the service layer, so only its format
  * is checked here.
  */

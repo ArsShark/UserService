@@ -34,6 +34,9 @@ public final class AccessRules {
       hasRole('ADMIN') or (@access.ownsUser(authentication, #id) \
       and @access.keepsEmail(#id, #request))""";
 
+  /** Only an admin may call the endpoint. */
+  public static final String ADMIN_ONLY = "hasRole('ADMIN')";
+
   private AccessRules() {
   }
 }
