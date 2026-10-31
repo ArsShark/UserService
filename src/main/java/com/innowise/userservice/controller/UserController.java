@@ -48,6 +48,7 @@ public class UserController {
   }
 
   /** Creates a user. Returns 201 with a {@code Location} header pointing to the new user. */
+  @PreAuthorize(AccessRules.ADMIN_ONLY)
   @PostMapping
   public ResponseEntity<UserResponse> create(@Valid @RequestBody UserRequest request) {
     UserResponse created = userService.create(request);
@@ -70,6 +71,7 @@ public class UserController {
    * Sorting is limited to {@link #USER_SORT}; the page size is capped by
    * {@code spring.data.web.pageable.max-page-size}.
    */
+  @PreAuthorize(AccessRules.ADMIN_ONLY)
   @GetMapping
   public ResponseEntity<PageResponse<UserResponse>> getAll(
     @RequestParam(required = false) String name,
@@ -102,6 +104,7 @@ public class UserController {
   }
 
   /** Deletes a user together with the user's cards. */
+  @PreAuthorize(AccessRules.ADMIN_ONLY)
   @DeleteMapping("/{id}")
   public ResponseEntity<Void> delete(@PathVariable Long id) {
     userService.delete(id);

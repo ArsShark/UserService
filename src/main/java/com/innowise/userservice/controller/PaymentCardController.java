@@ -84,6 +84,7 @@ public class PaymentCardController {
    * Returns a page of cards, optionally filtered by a part of the owner's name and surname.
    * Sorting is limited to {@link #CARD_SORT}.
    */
+  @PreAuthorize(AccessRules.ADMIN_ONLY)
   @GetMapping("/cards")
   public ResponseEntity<PageResponse<CardResponse>> getAll(
     @RequestParam(required = false) String name,
@@ -106,6 +107,7 @@ public class PaymentCardController {
    * Activates a card. Repeating the call has no further effect. Only an admin may do it: a user
    * could otherwise lift a block that an admin put on his card.
    */
+  @PreAuthorize(AccessRules.ADMIN_ONLY)
   @PatchMapping("/cards/{id}/activate")
   public ResponseEntity<CardResponse> activate(@PathVariable Long id) {
     return ResponseEntity.ok(paymentCardService.setActive(id, true));
