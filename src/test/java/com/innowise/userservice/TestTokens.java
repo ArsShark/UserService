@@ -146,7 +146,7 @@ public final class TestTokens {
         claims.expiresAt(expiresAt);
       }
       if (userId != null) {
-        claims.claim("userId", userId);
+        claims.claim("user_id", userId);
       }
       if (role != null) {
         claims.claim("role", role);

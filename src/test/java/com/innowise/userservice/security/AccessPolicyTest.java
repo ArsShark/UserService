@@ -59,7 +59,7 @@ class AccessPolicyTest {
         .header("alg", "RS256")
         .claim("role", "USER");
     if (profileClaim != null) {
-      jwt.claim("userId", profileClaim);
+      jwt.claim("user_id", profileClaim);
     }
     return new JwtAuthenticationToken(jwt.build(), List.of());
   }

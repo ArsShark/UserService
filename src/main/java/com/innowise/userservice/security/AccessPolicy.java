@@ -26,7 +26,7 @@ import org.springframework.stereotype.Component;
 public class AccessPolicy {
 
   /** The claim that holds the id of the profile of the caller in this service. */
-  public static final String CLAIM_USER_ID = "userId";
+  public static final String CLAIM_USER_ID = "user_id";
 
   private final UserRepository userRepository;
   private final PaymentCardRepository paymentCardRepository;

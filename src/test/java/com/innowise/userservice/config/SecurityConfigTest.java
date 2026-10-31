@@ -174,7 +174,7 @@ class SecurityConfigTest {
         .jwt(token -> {
           token.claim("role", "USER");
           if (profileId != null) {
-            token.claim("userId", profileId);
+            token.claim("user_id", profileId);
           }
         })
         .authorities(new SimpleGrantedAuthority("ROLE_USER"));

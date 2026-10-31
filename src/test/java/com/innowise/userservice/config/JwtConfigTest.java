@@ -69,7 +69,7 @@ class JwtConfigTest {
 
     assertAll(
         () -> assertEquals("1", jwt.getSubject()),
-        () -> assertEquals(7L, ((Number) jwt.getClaims().get("userId")).longValue()),
+        () -> assertEquals(7L, ((Number) jwt.getClaims().get("user_id")).longValue()),
         () -> assertEquals("USER", jwt.getClaimAsString("role")),
         () -> assertEquals("user@example.com", jwt.getClaimAsString("email")),
         () -> assertEquals("access", jwt.getClaimAsString("token_type")),
@@ -82,7 +82,7 @@ class JwtConfigTest {
 
     assertAll(
         () -> assertEquals("ADMIN", jwt.getClaimAsString("role")),
-        () -> assertFalse(jwt.hasClaim("userId")));
+        () -> assertFalse(jwt.hasClaim("user_id")));
   }
 
   /** There is no clock skew: the token is valid up to its {@code exp} and not a second longer. */
