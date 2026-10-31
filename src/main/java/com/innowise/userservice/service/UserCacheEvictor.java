@@ -1,28 +1,34 @@
 package com.innowise.userservice.service;
 
-import com.innowise.userservice.config.CacheConfig;
-import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Component;
 
 /**
- * Evicts a user from the user cache.
+ * Asks for a user to be evicted from the user cache.
  *
  * <p>The cached {@code UserWithCardsResponse} contains the cards, so every change of a card must
- * evict its owner. The eviction lives in its own bean for two reasons: Spring applies cache
- * annotations only to calls that go through a bean proxy, so a method of the same class would
- * be ignored (self-invocation); and one bean gives every card operation the same rule and the
- * same failure handling as the other cache operations.
+ * evict its owner. One bean gives every card operation the same rule.
+ *
+ * <p>The eviction itself does not happen here. This class publishes a
+ * {@link UserCacheEvictionEvent}; {@link UserCacheEvictionListener} removes the entry after the
+ * transaction of the caller has committed (see the listener for the reason).
  */
 @Component
 public class UserCacheEvictor {
 
+  private final ApplicationEventPublisher publisher;
+
+  public UserCacheEvictor(ApplicationEventPublisher publisher) {
+    this.publisher = publisher;
+  }
+
   /**
-   * Removes the cached user, if present.
+   * Schedules the removal of the cached user: after the commit of the current transaction, or at
+   * once when there is none.
    *
    * @param userId id of the user whose cache entry is evicted
    */
-  @CacheEvict(cacheNames = CacheConfig.USERS, key = "#userId")
   public void evict(Long userId) {
-    // Intentionally empty: the cache advice removes the entry.
+    publisher.publishEvent(new UserCacheEvictionEvent(userId));
   }
 }

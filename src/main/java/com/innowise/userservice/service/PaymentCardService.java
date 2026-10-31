@@ -30,8 +30,9 @@ import org.springframework.transaction.annotation.Transactional;
  * {@link Transactional}. Entities are converted to DTOs inside the transaction, because
  * open-in-view is disabled and lazy associations cannot be read after it ends.
  * <p>Every change of a card evicts its owner from the user cache, because the cached user
- * contains its cards. The eviction runs inside the transaction of the method, just before the
- * commit; a read that slips in between can cache stale data for at most the TTL of the cache.
+ * contains its cards. The eviction is requested inside the transaction but carried out after
+ * the commit (see {@link UserCacheEvictionListener}), so a concurrent read cannot cache the old
+ * state again.
  */
 @Service
 @Transactional(readOnly = true)

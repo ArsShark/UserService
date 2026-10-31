@@ -44,7 +44,8 @@ import org.springframework.test.context.junit.jupiter.SpringJUnitConfig;
  * cache configuration and an in-memory cache.
  */
 @SpringJUnitConfig({CacheConfig.class, UserService.class, PaymentCardService.class,
-  UserCacheEvictor.class, UserMapperImpl.class, PaymentCardMapperImpl.class,
+  UserCacheEvictor.class, UserCacheEvictionListener.class, UserMapperImpl.class,
+  PaymentCardMapperImpl.class,
   SharedCacheTestConfiguration.class, PaymentCardServiceCachingTest.TestConfig.class})
 @TestPropertySource(properties = "app.cache.users-ttl=10m")
 class PaymentCardServiceCachingTest {
