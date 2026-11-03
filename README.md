@@ -92,15 +92,22 @@ reads from `AUTH_JWKS_URI`.
 | `GET /api/cards` | yes | no | no |
 | `GET`, `PUT`, `DELETE /api/cards/{id}`, `PATCH /api/cards/{id}/deactivate` | yes | own cards | no |
 | `PATCH /api/cards/{id}/activate` | yes | no (an admin may have blocked the card) | no |
-| `POST /internal/users`, `DELETE /internal/users/{id}` | no | no | yes |
+| `POST /internal/users`, `GET /internal/users/by-email`, `DELETE /internal/users/{id}` | no | no | yes |
 
 - Somebody else's **profile** is a 403 (no database access, the answer does not depend on whether
   the id exists). Somebody else's **card** is the same 404 as a card that does not exist, so a
   caller cannot find out which card ids are taken. A `USER` token without `user_id` owns nothing.
-- `/internal/**` is for other services (the Gateway registers a user and rolls the profile back).
-  It needs the header `X-Internal-Key` with the value of `INTERNAL_API_KEY`, compared in constant
-  time; a missing and a wrong key give the same 401. The Gateway does not route this prefix, so
-  it is not reachable from outside. The key opens nothing else.
+- `/internal/**` is for other services: the Authentication Service creates a profile while a user
+  registers and rolls it back, and the Order Service looks a profile up by email. It needs the
+  header `X-Internal-Key` with the value of `INTERNAL_API_KEY`, compared in constant time; a
+  missing and a wrong key give the same 401. The Gateway does not route this prefix, so it is not
+  reachable from outside. The key opens nothing else.
+- `GET /internal/users/by-email?email=...` answers with the profile (the same `UserResponse` as
+  the public endpoints: no cards, an inactive profile included, with its `active` flag). The
+  email is normalized like on creation, so its case and surrounding spaces do not matter. An
+  unknown or blank email is a 404 whose text does not contain the email, a missing parameter is a
+  400. The answer is not cached. The email is in the query string, so keep access logs of a
+  proxy in front of this service in mind: this service itself never logs it.
 
 ### Known limits
 
@@ -187,7 +194,7 @@ docker compose down -v                             # stop and delete the data vo
 
 ## API check with Postman
 
-`postman/UserService_postman_collection.json` (70 requests, 161 checks) is the manual check of the whole
+`postman/UserService_postman_collection.json` (73 requests, 170 checks) is the manual check of the whole
 API, through the real Authentication Service. Import it, start PostgreSQL, Redis, the Authentication
 Service (port 8081) and this service (port 8082), then set the **current values** of the collection
 variables `adminLogin`, `adminPassword` (the first admin of the Authentication Service,
@@ -200,7 +207,7 @@ Run the folders top to bottom with the Collection Runner:
 |--------|----------------|
 | `0. Authentication` | login as the admin; the token is kept in `accessToken` and sent by every request |
 | `1.` to `4.` | users and cards as the admin: happy path, validation and errors, the limit of 5 active cards, delete and cascade |
-| `5. Access control` | a user created through the internal endpoints: his own resources work, somebody else's are 403 or 404, admin-only endpoints are 403, bad tokens and a refresh token are 401, the internal key and its rollback |
+| `5. Access control` | a user created through the internal endpoints: his own resources work, somebody else's are 403 or 404, admin-only endpoints are 403, bad tokens and a refresh token are 401, the internal key, the lookup by email and the rollback |
 
 Every run uses unique data and removes the profiles it created. The Authentication Service keeps
 the account of the test user (it has no delete): each run adds one account with a unique login.
