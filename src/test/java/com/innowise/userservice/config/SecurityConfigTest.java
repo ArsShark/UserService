@@ -124,10 +124,11 @@ class SecurityConfigTest {
         Arguments.of("DELETE", "/api/cards/1"));
   }
 
-  /** The two internal endpoints with their methods. */
+  /** The three internal endpoints with their methods. */
   static Stream<Arguments> internalEndpoints() {
     return Stream.of(
         Arguments.of("POST", "/internal/users"),
+        Arguments.of("GET", "/internal/users/by-email"),
         Arguments.of("DELETE", "/internal/users/1"));
   }
 
@@ -377,10 +378,12 @@ class SecurityConfigTest {
             jsonPath("$.detail").value(ACCESS_DENIED));
   }
 
-  /** Only the two endpoints are opened, each with its method; the rest of /internal is closed. */
+  /** Only the three endpoints are opened, each with its method; the rest of /internal is closed. */
   @ParameterizedTest(name = "{0} {1}")
   @ValueSource(strings = {"GET /internal/users", "PUT /internal/users/1",
-      "GET /internal/users/1", "POST /internal/other", "DELETE /internal/users"})
+      "GET /internal/users/1", "POST /internal/other", "DELETE /internal/users",
+      "POST /internal/users/by-email", "PUT /internal/users/by-email",
+      "GET /internal/users/by-email/1"})
   void everythingElseUnderInternalStaysClosedEvenWithTheRightKey(String endpoint)
       throws Exception {
     String[] parts = endpoint.split(" ");

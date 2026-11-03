@@ -3,6 +3,7 @@ package com.innowise.userservice.service;
 import static com.innowise.userservice.service.ServiceTestEntities.user;
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
@@ -138,6 +139,45 @@ class UserServiceTest {
     assertThrows(UserNotFoundException.class, () -> userService.getById(USER_ID));
 
     verifyNoInteractions(userMapper);
+  }
+
+  @Test
+  void getByEmailFindsTheUserByTheNormalizedEmail() {
+    User found = user(USER_ID);
+    UserResponse expected = response(USER_ID, "ivan.petrov@example.com");
+    when(userRepository.findByEmail("ivan.petrov@example.com")).thenReturn(Optional.of(found));
+    when(userMapper.toResponse(found)).thenReturn(expected);
+
+    assertSame(expected, userService.getByEmail("  Ivan.Petrov@Example.COM "));
+  }
+
+  @Test
+  void getByEmailRejectsAnUnknownEmailWithoutNamingIt() {
+    when(userRepository.findByEmail("nobody@example.com")).thenReturn(Optional.empty());
+
+    UserNotFoundException thrown = assertThrows(UserNotFoundException.class,
+      () -> userService.getByEmail("Nobody@Example.com"));
+
+    assertAll(
+      () -> assertFalse(thrown.getMessage().toLowerCase(Locale.ROOT).contains("nobody")),
+      () -> verifyNoInteractions(userMapper));
+  }
+
+  @Test
+  void getByEmailNormalizesIndependentlyOfDefaultLocale() {
+    Locale original = Locale.getDefault();
+    // In the Turkish locale a plain toLowerCase() turns "I" into a dotless i.
+    Locale.setDefault(Locale.forLanguageTag("tr-TR"));
+    try {
+      User found = user(USER_ID);
+      UserResponse expected = response(USER_ID, "info@example.com");
+      when(userRepository.findByEmail("info@example.com")).thenReturn(Optional.of(found));
+      when(userMapper.toResponse(found)).thenReturn(expected);
+
+      assertSame(expected, userService.getByEmail("INFO@Example.COM"));
+    } finally {
+      Locale.setDefault(original);
+    }
   }
 
   @Test

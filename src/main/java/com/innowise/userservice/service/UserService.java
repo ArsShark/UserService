@@ -82,6 +82,24 @@ public class UserService {
   }
 
   /**
+   * Finds a user by email. The Order Service uses it to turn the email of an access token into a
+   * profile.
+   *
+   * <p>The email is normalized like on creation, so the lookup does not depend on the case or on
+   * surrounding spaces. An inactive user is returned too, with its flag. The answer has no cards
+   * and is not cached: the cache is keyed by user id.
+   *
+   * @param email an email as the caller knows it
+   * @return the user without cards
+   * @throws UserNotFoundException if nobody has this email; the message does not contain it
+   */
+  public UserResponse getByEmail(String email) {
+    return userRepository.findByEmail(EmailNormalizer.normalize(email))
+      .map(userMapper::toResponse)
+      .orElseThrow(UserNotFoundException::forEmail);
+  }
+
+  /**
    * Returns a page of users, optionally filtered by name and surname.
    *
    * @param name text the name must contain (ignoring case), {@code null} or blank for any

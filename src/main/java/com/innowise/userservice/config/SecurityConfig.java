@@ -44,8 +44,9 @@ import org.springframework.web.servlet.HandlerExceptionResolver;
  * <p>{@code /internal/**} is for other services only. It requires the role
  * {@value InternalKeyAuthenticationFilter#ROLE}, which only the
  * {@link InternalKeyAuthenticationFilter} grants, and only for a request with the right internal
- * key. Only the two endpoints of {@code InternalUserController} are opened, each with its method;
- * another method or path under {@code /internal} stays closed. A missing key stops the startup.
+ * key. Only the three endpoints of {@code InternalUserController} are opened, each with its
+ * method; another method or path under {@code /internal} stays closed. A missing key stops the
+ * startup.
  *
  * <p>The ERROR dispatch is permitted: when the servlet container forwards a failed request to the
  * error page, that internal forward must not be denied again, otherwise the client would see
@@ -102,8 +103,9 @@ public class SecurityConfig {
             BearerTokenAuthenticationFilter.class)
         .authorizeHttpRequests(requests -> requests
             .dispatcherTypeMatchers(DispatcherType.ERROR).permitAll()
-            // Internal endpoints: the Gateway, with the internal key.
+            // Internal endpoints: the other services, with the internal key.
             .requestMatchers(HttpMethod.POST, "/internal/users").hasRole(INTERNAL)
+            .requestMatchers(HttpMethod.GET, "/internal/users/by-email").hasRole(INTERNAL)
             .requestMatchers(HttpMethod.DELETE, "/internal/users/*").hasRole(INTERNAL)
             // Users: the list and every change of the whole user are for an admin only.
             .requestMatchers(HttpMethod.POST, "/api/users").hasRole(ADMIN)

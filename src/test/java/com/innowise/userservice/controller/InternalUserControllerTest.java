@@ -1,5 +1,7 @@
 package com.innowise.userservice.controller;
 
+import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.not;
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
@@ -8,6 +10,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
@@ -145,11 +148,62 @@ class InternalUserControllerTest {
   }
 
   @Test
+  void getByEmailReturns200WithTheProfile() throws Exception {
+    when(userService.getByEmail("anna@example.com")).thenReturn(user(7));
+
+    mockMvc.perform(get("/internal/users/by-email")
+        .header(InternalKeyAuthenticationFilter.HEADER, KEY)
+        .param("email", "anna@example.com")).andExpectAll(
+        status().isOk(),
+        jsonPath("$.id").value(7),
+        jsonPath("$.email").value("anna@example.com"),
+        jsonPath("$.active").value(true),
+        jsonPath("$.cards").doesNotExist());
+  }
+
+  /** The controller passes the email on untouched; normalizing it is the job of the service. */
+  @Test
+  void getByEmailPassesTheEmailOnAsItCame() throws Exception {
+    when(userService.getByEmail(" Anna+Shop@Example.com ")).thenReturn(user(7));
+
+    mockMvc.perform(get("/internal/users/by-email")
+        .header(InternalKeyAuthenticationFilter.HEADER, KEY)
+        .param("email", " Anna+Shop@Example.com ")).andExpect(status().isOk());
+
+    verify(userService).getByEmail(" Anna+Shop@Example.com ");
+  }
+
+  @Test
+  void getByEmailAnswers404ForAnUnknownEmailAndNeverEchoesIt() throws Exception {
+    when(userService.getByEmail("nobody@example.com")).thenThrow(UserNotFoundException.forEmail());
+
+    mockMvc.perform(get("/internal/users/by-email")
+        .header(InternalKeyAuthenticationFilter.HEADER, KEY)
+        .param("email", "nobody@example.com")).andExpectAll(
+        status().isNotFound(),
+        content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON),
+        jsonPath("$.status").value(404),
+        content().string(not(containsString("nobody"))));
+  }
+
+  @Test
+  void getByEmailWithoutTheParameterIs400() throws Exception {
+    mockMvc.perform(get("/internal/users/by-email")
+        .header(InternalKeyAuthenticationFilter.HEADER, KEY)).andExpectAll(
+        status().isBadRequest(),
+        content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON));
+
+    verifyNoInteractions(userService);
+  }
+
+  @Test
   void aRequestWithoutTheKeyNeverReachesTheService() throws Exception {
     mockMvc.perform(post("/internal/users")
         .contentType(MediaType.APPLICATION_JSON)
         .content(VALID_USER_JSON)).andExpect(status().isUnauthorized());
     mockMvc.perform(delete("/internal/users/{id}", 7)).andExpect(status().isUnauthorized());
+    mockMvc.perform(get("/internal/users/by-email").param("email", "anna@example.com"))
+        .andExpect(status().isUnauthorized());
 
     verifyNoInteractions(userService);
   }
