@@ -568,7 +568,7 @@
           }
         },
         {
-          "name": "11 Deactivate user",
+          "name": "11 Deactivate user (PATCH status)",
           "event": [
             {
               "listen": "test",
@@ -585,9 +585,14 @@
           ],
           "request": {
             "method": "PATCH",
-            "header": [],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "url": {
-              "raw": "{{baseUrl}}/api/users/{{userId}}/deactivate",
+              "raw": "{{baseUrl}}/api/users/{{userId}}/status",
               "host": [
                 "{{baseUrl}}"
               ],
@@ -595,13 +600,22 @@
                 "api",
                 "users",
                 "{{userId}}",
-                "deactivate"
+                "status"
               ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"active\": false}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
             }
           }
         },
         {
-          "name": "12 Activate user",
+          "name": "12 Activate user (PATCH status)",
           "event": [
             {
               "listen": "test",
@@ -618,9 +632,14 @@
           ],
           "request": {
             "method": "PATCH",
-            "header": [],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "url": {
-              "raw": "{{baseUrl}}/api/users/{{userId}}/activate",
+              "raw": "{{baseUrl}}/api/users/{{userId}}/status",
               "host": [
                 "{{baseUrl}}"
               ],
@@ -628,8 +647,17 @@
                 "api",
                 "users",
                 "{{userId}}",
-                "activate"
+                "status"
               ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"active\": true}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
             }
           }
         },

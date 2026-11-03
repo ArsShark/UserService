@@ -66,7 +66,7 @@ reads from `AUTH_JWKS_URI`.
 - **What is checked:** the RS256 signature, the issuer (`JWT_ISSUER`), the time (no clock skew,
   `exp` is required, the application clock is used) and `token_type = access`, so a refresh token
   never works. The claim `role` (`ADMIN` or `USER`, exactly) becomes the authority; the claim
-  `userId` is the id of the caller's profile and decides the ownership of resources.
+  `user_id` is the id of the caller's profile and decides the ownership of resources.
 - **The key set** is fetched on the first token, not at startup, and cached for 5 minutes. A
   fetch has a 2 second timeout and a 64 KB limit, and an unknown `kid` may cause at most one
   refresh per 30 seconds, so a flood of forged tokens cannot make this service call the
@@ -87,7 +87,7 @@ reads from `AUTH_JWKS_URI`.
 | `POST /api/users`, `GET /api/users` | yes | no | no |
 | `GET /api/users/{id}` | yes | own profile | no |
 | `PUT /api/users/{id}` | yes | own profile, **the email cannot be changed** | no |
-| `PATCH /api/users/{id}/activate`, `/deactivate`, `DELETE /api/users/{id}` | yes | no | no |
+| `PATCH /api/users/{id}/status`, `DELETE /api/users/{id}` | yes | no | no |
 | `POST`, `GET /api/users/{userId}/cards` | yes | own cards | no |
 | `GET /api/cards` | yes | no | no |
 | `GET`, `PUT`, `DELETE /api/cards/{id}`, `PATCH /api/cards/{id}/deactivate` | yes | own cards | no |
@@ -96,7 +96,7 @@ reads from `AUTH_JWKS_URI`.
 
 - Somebody else's **profile** is a 403 (no database access, the answer does not depend on whether
   the id exists). Somebody else's **card** is the same 404 as a card that does not exist, so a
-  caller cannot find out which card ids are taken. A `USER` token without `userId` owns nothing.
+  caller cannot find out which card ids are taken. A `USER` token without `user_id` owns nothing.
 - `/internal/**` is for other services (the Gateway registers a user and rolls the profile back).
   It needs the header `X-Internal-Key` with the value of `INTERNAL_API_KEY`, compared in constant
   time; a missing and a wrong key give the same 401. The Gateway does not route this prefix, so
@@ -199,7 +199,7 @@ Run the folders top to bottom with the Collection Runner:
 | Folder | What it checks |
 |--------|----------------|
 | `0. Authentication` | login as the admin; the token is kept in `accessToken` and sent by every request |
-| `1.` to `4.` | users and cards as the admin: happy path, validation and errors, the limit of 5 cards, delete and cascade |
+| `1.` to `4.` | users and cards as the admin: happy path, validation and errors, the limit of 5 active cards, delete and cascade |
 | `5. Access control` | a user created through the internal endpoints: his own resources work, somebody else's are 403 or 404, admin-only endpoints are 403, bad tokens and a refresh token are 401, the internal key and its rollback |
 
 Every run uses unique data and removes the profiles it created. The Authentication Service keeps
