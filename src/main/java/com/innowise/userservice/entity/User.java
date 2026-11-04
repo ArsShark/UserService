@@ -11,6 +11,7 @@ import jakarta.persistence.Table;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -47,6 +48,16 @@ public class User extends AuditableEntity {
 
   @Column(name = "active", nullable = false)
   private boolean active = true;
+
+  /**
+   * The registration id that the Authentication Service sent with the creation of this profile,
+   * or {@code null} for a profile created in any other way (by an admin, or before the column
+   * existed). It is unique, never returned in a response, and its only use is to find the
+   * profile of one attempt to register in order to undo it when the answer of the creation was
+   * lost and the id of the profile is not known to the caller.
+   */
+  @Column(name = "registration_id")
+  private UUID registrationId;
 
   /**
    * Cards of the user. This is the inverse side of the association: the foreign key lives in

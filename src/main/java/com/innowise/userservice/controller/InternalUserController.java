@@ -4,6 +4,7 @@ import com.innowise.userservice.dto.request.UserRequest;
 import com.innowise.userservice.dto.response.UserResponse;
 import com.innowise.userservice.service.UserService;
 import jakarta.validation.Valid;
+import java.util.UUID;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -11,6 +12,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -32,6 +34,9 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/internal/users")
 public class InternalUserController {
 
+  /** The header with the registration id of the attempt that creates the profile. */
+  public static final String REGISTRATION_ID_HEADER = "X-Registration-Id";
+
   private final UserService userService;
 
   public InternalUserController(UserService userService) {
@@ -41,10 +46,16 @@ public class InternalUserController {
   /**
    * Creates a user profile. Returns 201 with the profile; the caller reads the id from the body,
    * so there is no {@code Location} header.
+   *
+   * <p>The optional header {@code X-Registration-Id} is a UUID that the caller chose for this
+   * attempt to register. It is stored with the profile and never returned. A value that is not a
+   * UUID is a 400; the same id sent twice is a 409.
    */
   @PostMapping
-  public ResponseEntity<UserResponse> create(@Valid @RequestBody UserRequest request) {
-    return ResponseEntity.status(HttpStatus.CREATED).body(userService.create(request));
+  public ResponseEntity<UserResponse> create(@Valid @RequestBody UserRequest request,
+      @RequestHeader(name = REGISTRATION_ID_HEADER, required = false) UUID registrationId) {
+    return ResponseEntity.status(HttpStatus.CREATED)
+        .body(userService.create(request, registrationId));
   }
 
   /**

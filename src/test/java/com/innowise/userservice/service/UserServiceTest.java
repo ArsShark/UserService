@@ -4,6 +4,7 @@ import static com.innowise.userservice.service.ServiceTestEntities.user;
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
@@ -30,6 +31,7 @@ import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
+import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -93,6 +95,43 @@ class UserServiceTest {
     assertAll(
       () -> assertSame(expected, actual),
       () -> assertEquals("ivan.petrov@example.com", mapped.getEmail()));
+  }
+
+  @Test
+  void createStoresTheRegistrationIdOfTheAttempt() {
+    UserRequest request = request("ivan@example.com");
+    UUID registrationId = UUID.fromString("0b9c4b5e-6f3e-4a56-9d3a-5f6f0d2a7c11");
+    User mapped = user(null);
+    mapped.setEmail(null);
+    User saved = user(USER_ID);
+    UserResponse expected = response(USER_ID, "ivan@example.com");
+    when(userRepository.existsByEmail("ivan@example.com")).thenReturn(false);
+    when(userMapper.toEntity(request)).thenReturn(mapped);
+    when(userRepository.save(mapped)).thenReturn(saved);
+    when(userMapper.toResponse(saved)).thenReturn(expected);
+
+    UserResponse actual = userService.create(request, registrationId);
+
+    assertAll(
+      () -> assertSame(expected, actual),
+      () -> assertEquals(registrationId, mapped.getRegistrationId()));
+  }
+
+  /** A profile that is not created by a registration (an admin creates it) has no id. */
+  @Test
+  void createWithoutARegistrationIdLeavesItEmpty() {
+    UserRequest request = request("ivan@example.com");
+    User mapped = user(null);
+    mapped.setEmail(null);
+    User saved = user(USER_ID);
+    when(userRepository.existsByEmail("ivan@example.com")).thenReturn(false);
+    when(userMapper.toEntity(request)).thenReturn(mapped);
+    when(userRepository.save(mapped)).thenReturn(saved);
+    when(userMapper.toResponse(saved)).thenReturn(response(USER_ID, "ivan@example.com"));
+
+    userService.create(request);
+
+    assertNull(mapped.getRegistrationId());
   }
 
   @Test

@@ -13,6 +13,7 @@ import jakarta.persistence.LockModeType;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
@@ -51,6 +52,23 @@ class UserRepositoryTest extends AbstractRepositoryTest {
       () -> assertTrue(userRepository.findByEmail("anna@example.com").isPresent()),
       () -> assertTrue(userRepository.existsByEmail("anna@example.com")),
       () -> assertFalse(userRepository.existsByEmail("nobody@example.com")));
+  }
+
+  @Test
+  void findByRegistrationIdFindsOnlyTheProfileOfThatAttempt() {
+    UUID registrationId = UUID.fromString("0b9c4b5e-6f3e-4a56-9d3a-5f6f0d2a7c11");
+    User attempt = TestEntities.user("Anna", "Petrova", "anna@example.com");
+    attempt.setRegistrationId(registrationId);
+    Long attemptId = userRepository.save(attempt).getId();
+    // Two profiles without an id are allowed: the constraint ignores NULLs.
+    userRepository.save(TestEntities.user("Ivan", "Petrov", "ivan@example.com"));
+    userRepository.save(TestEntities.user("Olga", "Sidorova", "olga@example.com"));
+    flushAndClear();
+
+    assertAll(
+      () -> assertEquals(attemptId,
+        userRepository.findByRegistrationId(registrationId).orElseThrow().getId()),
+      () -> assertTrue(userRepository.findByRegistrationId(UUID.randomUUID()).isEmpty()));
   }
 
   @Test

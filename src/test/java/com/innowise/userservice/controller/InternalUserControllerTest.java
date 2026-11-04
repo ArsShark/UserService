@@ -5,6 +5,8 @@ import static org.hamcrest.Matchers.not;
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -23,11 +25,13 @@ import com.innowise.userservice.config.SecurityConfig;
 import com.innowise.userservice.dto.request.UserRequest;
 import com.innowise.userservice.dto.response.UserResponse;
 import com.innowise.userservice.exception.EmailAlreadyExistsException;
+import com.innowise.userservice.exception.RegistrationIdAlreadyUsedException;
 import com.innowise.userservice.exception.UserNotFoundException;
 import com.innowise.userservice.security.InternalKeyAuthenticationFilter;
 import com.innowise.userservice.service.UserService;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -74,7 +78,7 @@ class InternalUserControllerTest {
 
   @Test
   void createReturns201WithTheProfileAndWithoutALocation() throws Exception {
-    when(userService.create(any(UserRequest.class))).thenReturn(user(7));
+    when(userService.create(any(UserRequest.class), isNull())).thenReturn(user(7));
 
     mockMvc.perform(post("/internal/users")
         .header(InternalKeyAuthenticationFilter.HEADER, KEY)
@@ -87,10 +91,56 @@ class InternalUserControllerTest {
         jsonPath("$.active").value(true));
 
     ArgumentCaptor<UserRequest> request = ArgumentCaptor.forClass(UserRequest.class);
-    verify(userService).create(request.capture());
+    verify(userService).create(request.capture(), isNull());
     assertAll(
         () -> assertEquals("Anna", request.getValue().name()),
         () -> assertEquals("anna@example.com", request.getValue().email()));
+  }
+
+  @Test
+  void createPassesTheRegistrationIdOfTheHeaderAndNeverReturnsIt() throws Exception {
+    UUID registrationId = UUID.fromString("0b9c4b5e-6f3e-4a56-9d3a-5f6f0d2a7c11");
+    when(userService.create(any(UserRequest.class), any(UUID.class))).thenReturn(user(7));
+
+    mockMvc.perform(post("/internal/users")
+        .header(InternalKeyAuthenticationFilter.HEADER, KEY)
+        .header(InternalUserController.REGISTRATION_ID_HEADER, registrationId.toString())
+        .contentType(MediaType.APPLICATION_JSON)
+        .content(VALID_USER_JSON)).andExpectAll(
+        status().isCreated(),
+        content().string(not(containsString(registrationId.toString()))));
+
+    verify(userService).create(any(UserRequest.class), eq(registrationId));
+  }
+
+  /** The header must be a UUID: nothing else can be the id of an attempt. */
+  @Test
+  void createRejectsARegistrationIdThatIsNotAUuidWith400() throws Exception {
+    mockMvc.perform(post("/internal/users")
+        .header(InternalKeyAuthenticationFilter.HEADER, KEY)
+        .header(InternalUserController.REGISTRATION_ID_HEADER, "not-a-uuid")
+        .contentType(MediaType.APPLICATION_JSON)
+        .content(VALID_USER_JSON)).andExpectAll(
+        status().isBadRequest(),
+        content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON));
+
+    verifyNoInteractions(userService);
+  }
+
+  @Test
+  void createAnswers409ForARegistrationIdThatIsAlreadyUsed() throws Exception {
+    when(userService.create(any(UserRequest.class), any(UUID.class)))
+        .thenThrow(new RegistrationIdAlreadyUsedException());
+
+    mockMvc.perform(post("/internal/users")
+        .header(InternalKeyAuthenticationFilter.HEADER, KEY)
+        .header(InternalUserController.REGISTRATION_ID_HEADER,
+            "0b9c4b5e-6f3e-4a56-9d3a-5f6f0d2a7c11")
+        .contentType(MediaType.APPLICATION_JSON)
+        .content(VALID_USER_JSON)).andExpectAll(
+        status().isConflict(),
+        content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON),
+        jsonPath("$.status").value(409));
   }
 
   @Test
@@ -108,7 +158,8 @@ class InternalUserControllerTest {
 
   @Test
   void createAnswers409ForATakenEmail() throws Exception {
-    when(userService.create(any(UserRequest.class))).thenThrow(new EmailAlreadyExistsException());
+    when(userService.create(any(UserRequest.class), any()))
+        .thenThrow(new EmailAlreadyExistsException());
 
     mockMvc.perform(post("/internal/users")
         .header(InternalKeyAuthenticationFilter.HEADER, KEY)

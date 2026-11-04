@@ -10,6 +10,7 @@ import com.innowise.userservice.mapper.UserMapper;
 import com.innowise.userservice.repository.UserRepository;
 import com.innowise.userservice.repository.specification.UserSpecifications;
 import com.innowise.userservice.config.CacheConfig;
+import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.cache.annotation.CacheEvict;
@@ -53,12 +54,29 @@ public class UserService {
    */
   @Transactional
   public UserResponse create(UserRequest request) {
+    return create(request, null);
+  }
+
+  /**
+   * Creates an active user without cards and remembers the registration id of the attempt that
+   * created it. The Authentication Service sends the id so that it can delete the profile of a
+   * failed registration even when it never learned the id of the profile (the answer was lost).
+   *
+   * @param request user data; the email is normalized before it is checked and stored
+   * @param registrationId the id of the attempt to register, or {@code null} for a profile that
+   *     is not created by a registration
+   * @return the created user
+   * @throws EmailAlreadyExistsException if the normalized email is already used
+   */
+  @Transactional
+  public UserResponse create(UserRequest request, UUID registrationId) {
     String email = EmailNormalizer.normalize(request.email());
     if (userRepository.existsByEmail(email)) {
       throw new EmailAlreadyExistsException();
     }
     User user = userMapper.toEntity(request);
     user.setEmail(email);
+    user.setRegistrationId(registrationId);
     User saved = userRepository.save(user);
     LOGGER.info("Created user with id {}", saved.getId());
     return userMapper.toResponse(saved);

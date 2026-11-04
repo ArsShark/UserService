@@ -3,3 +3,5 @@ databaseChangeLog:
       file: db/changelog/changes/001-create-users-table.yaml
   - include:
       file: db/changelog/changes/002-create-payment-cards-table.yaml
+  - include:
+      file: db/changelog/changes/003-add-registration-id-to-users.yaml
