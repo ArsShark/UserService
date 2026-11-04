@@ -178,6 +178,41 @@ class InternalUserControllerTest {
     verify(userService).delete(7L);
   }
 
+  @Test
+  void deleteByRegistrationIdReturns204() throws Exception {
+    UUID registrationId = UUID.fromString("0b9c4b5e-6f3e-4a56-9d3a-5f6f0d2a7c11");
+
+    mockMvc.perform(delete("/internal/users/by-registration/{registrationId}", registrationId)
+        .header(InternalKeyAuthenticationFilter.HEADER, KEY)).andExpect(status().isNoContent());
+
+    verify(userService).deleteByRegistrationId(registrationId);
+  }
+
+  /** The caller treats this answer as "already gone": the profile may never have been created. */
+  @Test
+  void deleteByRegistrationIdAnswers404ForAnUnknownIdWithoutEchoingIt() throws Exception {
+    UUID registrationId = UUID.fromString("0b9c4b5e-6f3e-4a56-9d3a-5f6f0d2a7c11");
+    doThrow(UserNotFoundException.forRegistration()).when(userService)
+        .deleteByRegistrationId(registrationId);
+
+    mockMvc.perform(delete("/internal/users/by-registration/{registrationId}", registrationId)
+        .header(InternalKeyAuthenticationFilter.HEADER, KEY)).andExpectAll(
+        status().isNotFound(),
+        content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON),
+        jsonPath("$.status").value(404),
+        content().string(not(containsString(registrationId.toString()))));
+  }
+
+  @Test
+  void deleteByRegistrationIdRejectsAnIdThatIsNotAUuidWith400() throws Exception {
+    mockMvc.perform(delete("/internal/users/by-registration/{registrationId}", "not-a-uuid")
+        .header(InternalKeyAuthenticationFilter.HEADER, KEY)).andExpectAll(
+        status().isBadRequest(),
+        content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON));
+
+    verifyNoInteractions(userService);
+  }
+
   /** The caller of the rollback treats this answer as "already rolled back". */
   @Test
   void deleteAnswers404ForAMissingUser() throws Exception {

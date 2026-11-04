@@ -54,6 +54,8 @@ class SecretsNotLoggedIntegrationTest extends AbstractIntegrationTest {
   private static final String CHANGED_EMAIL = "changed.secret@example.com";
   private static final String CAROL_EMAIL = "carol.secret@example.com";
   private static final String UNKNOWN_EMAIL = "nobody.secret@example.com";
+  private static final String DAVE_EMAIL = "dave.secret@example.com";
+  private static final String REGISTRATION_ID = "0b9c4b5e-6f3e-4a56-9d3a-5f6f0d2a7c11";
   private static final String INVALID_EMAIL = "not-an-email-4711";
   private static final String ANNA_CARD = cardNumber(1);
   private static final String BORIS_CARD = cardNumber(2);
@@ -116,6 +118,17 @@ class SecretsNotLoggedIntegrationTest extends AbstractIntegrationTest {
           .andExpect(status().isNoContent());
       internal(delete("/internal/users/{id}", carolId), INTERNAL_KEY, null)
           .andExpect(status().isNotFound());
+      // The undoing by registration id: a creation with the header, the deletion, a repeat, a
+      // wrong key. The registration id is random and may be logged; the email may not.
+      String dave = userJson("Dave", "Jones", DAVE_EMAIL);
+      internal(post("/internal/users").header("X-Registration-Id", REGISTRATION_ID), INTERNAL_KEY,
+          dave).andExpect(status().isCreated());
+      internal(delete("/internal/users/by-registration/{id}", REGISTRATION_ID), WRONG_INTERNAL_KEY,
+          null).andExpect(status().isUnauthorized());
+      internal(delete("/internal/users/by-registration/{id}", REGISTRATION_ID), INTERNAL_KEY,
+          null).andExpect(status().isNoContent());
+      internal(delete("/internal/users/by-registration/{id}", REGISTRATION_ID), INTERNAL_KEY,
+          null).andExpect(status().isNotFound());
     } finally {
       logs.close();
     }
@@ -128,6 +141,7 @@ class SecretsNotLoggedIntegrationTest extends AbstractIntegrationTest {
         .toList();
     assertAll(
         () -> assertTrue(containsLine(lines, "Created user with id"), "the capture sees writes"),
+        () -> assertTrue(containsLine(lines, "undoing registration"), "and the undoing"),
         () -> assertTrue(containsLine(lines, "Request rejected with status 401"), "and the 401"),
         () -> assertTrue(containsLine(lines, "Request rejected with status 403"), "and the 403"),
         () -> assertTrue(containsLine(lines, "Request rejected with status 409"), "and the 409"),
@@ -159,6 +173,7 @@ class SecretsNotLoggedIntegrationTest extends AbstractIntegrationTest {
     secrets.put("boris email", BORIS_EMAIL);
     secrets.put("changed email", CHANGED_EMAIL);
     secrets.put("carol email", CAROL_EMAIL);
+    secrets.put("dave email", DAVE_EMAIL);
     secrets.put("unknown email", UNKNOWN_EMAIL);
     secrets.put("rejected email", INVALID_EMAIL);
     secrets.put("anna card number", ANNA_CARD);

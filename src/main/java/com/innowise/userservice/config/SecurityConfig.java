@@ -107,6 +107,8 @@ public class SecurityConfig {
             .requestMatchers(HttpMethod.POST, "/internal/users").hasRole(INTERNAL)
             .requestMatchers(HttpMethod.GET, "/internal/users/by-email").hasRole(INTERNAL)
             .requestMatchers(HttpMethod.DELETE, "/internal/users/*").hasRole(INTERNAL)
+            .requestMatchers(HttpMethod.DELETE, "/internal/users/by-registration/*")
+            .hasRole(INTERNAL)
             // Users: the list and every change of the whole user are for an admin only.
             .requestMatchers(HttpMethod.POST, "/api/users").hasRole(ADMIN)
             .requestMatchers(HttpMethod.GET, "/api/users").hasRole(ADMIN)

@@ -20,8 +20,10 @@ import org.springframework.web.bind.annotation.RestController;
 /**
  * Endpoints for the other services, mounted at {@code /internal/users}.
  *
- * <p>The Authentication Service calls the first two while a user registers, before the user has
- * a token: it creates the profile first and deletes it again if it cannot save the account. The
+ * <p>The Authentication Service calls the create and the two deletes while a user registers,
+ * before the user has a token: it creates the profile first and deletes it again, by the
+ * registration id of the attempt, if it cannot save the account or never saw the answer of the
+ * creation. The
  * Order Service calls the lookup by email with the email of its caller. The security chain lets
  * only a caller with the right {@code X-Internal-Key} in. The prefix is not under
  * {@code /api/**} on purpose: the Gateway routes only {@code /api/**} to the outside, so these
@@ -65,6 +67,20 @@ public class InternalUserController {
   @DeleteMapping("/{id}")
   public ResponseEntity<Void> delete(@PathVariable Long id) {
     userService.delete(id);
+    return ResponseEntity.noContent().build();
+  }
+
+  /**
+   * Deletes the profile that was created with this registration id, together with its cards: the
+   * undoing of a registration whose creation ended without a usable answer, when the id of the
+   * profile is not known. The id belongs to one attempt, so no other profile is affected. A 404
+   * means that no such profile exists, and the caller treats that as "already gone": the
+   * creation may never have happened, or the profile was deleted by an earlier attempt of the
+   * undoing, so the call is safe to repeat.
+   */
+  @DeleteMapping("/by-registration/{registrationId}")
+  public ResponseEntity<Void> deleteByRegistrationId(@PathVariable UUID registrationId) {
+    userService.deleteByRegistrationId(registrationId);
     return ResponseEntity.noContent().build();
   }
 

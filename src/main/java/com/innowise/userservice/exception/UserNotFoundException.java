@@ -20,4 +20,14 @@ public class UserNotFoundException extends RuntimeException {
   public static UserNotFoundException forEmail() {
     return new UserNotFoundException("User with the given email not found");
   }
+
+  /**
+   * Creates the exception for a lookup by registration id. The message does not repeat the id:
+   * the caller knows it, and it is not needed in a response.
+   *
+   * @return the exception for a registration id that no profile was created with
+   */
+  public static UserNotFoundException forRegistration() {
+    return new UserNotFoundException("User with the given registration id not found");
+  }
 }

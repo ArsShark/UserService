@@ -357,6 +357,32 @@ class UserServiceTest {
   }
 
   @Test
+  void deleteByRegistrationIdRemovesTheLoadedProfileAndReturnsItsId() {
+    UUID registrationId = UUID.fromString("0b9c4b5e-6f3e-4a56-9d3a-5f6f0d2a7c11");
+    User existing = user(USER_ID);
+    when(userRepository.findByRegistrationId(registrationId)).thenReturn(Optional.of(existing));
+
+    Long deleted = userService.deleteByRegistrationId(registrationId);
+
+    assertAll(
+      () -> assertEquals(USER_ID, deleted),
+      () -> verify(userRepository).delete(existing));
+  }
+
+  @Test
+  void deleteByRegistrationIdRejectsAnUnknownIdWithoutNamingIt() {
+    UUID registrationId = UUID.fromString("0b9c4b5e-6f3e-4a56-9d3a-5f6f0d2a7c11");
+    when(userRepository.findByRegistrationId(registrationId)).thenReturn(Optional.empty());
+
+    UserNotFoundException error = assertThrows(UserNotFoundException.class,
+      () -> userService.deleteByRegistrationId(registrationId));
+
+    assertAll(
+      () -> assertFalse(error.getMessage().contains(registrationId.toString())),
+      () -> verify(userRepository, never()).delete(any(User.class)));
+  }
+
+  @Test
   void deleteRejectsUnknownUser() {
     when(userRepository.findById(USER_ID)).thenReturn(Optional.empty());
 

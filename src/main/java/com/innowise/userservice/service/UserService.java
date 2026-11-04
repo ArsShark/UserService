@@ -193,6 +193,33 @@ public class UserService {
     LOGGER.info("Deleted user with id {}", id);
   }
 
+  /**
+   * Deletes the profile that was created with the given registration id, together with its
+   * cards. The Authentication Service uses it to undo a registration, also when the answer of
+   * the creation was lost and it does not know the id of the profile. The registration id
+   * belongs to one attempt, so no other profile can be affected, not even one with the same
+   * email.
+   *
+   * <p>The cache entry of the deleted user is evicted after the commit. The cache key is the id
+   * of the user, which the caller of this method does not have, so the method returns it and the
+   * annotation reads it from the result.
+   *
+   * @param registrationId the id that was sent with the creation
+   * @return the id of the deleted user
+   * @throws UserNotFoundException if no profile was created with this id (the caller treats that
+   *     as "already gone")
+   */
+  @CacheEvict(cacheNames = CacheConfig.USERS, key = "#result")
+  @Transactional
+  public Long deleteByRegistrationId(UUID registrationId) {
+    User user = userRepository.findByRegistrationId(registrationId)
+      .orElseThrow(UserNotFoundException::forRegistration);
+    Long id = user.getId();
+    userRepository.delete(user);
+    LOGGER.info("Deleted user with id {} (undoing registration {})", id, registrationId);
+    return id;
+  }
+
   private User getUserOrThrow(Long id) {
     return userRepository.findById(id).orElseThrow(() -> new UserNotFoundException(id));
   }
