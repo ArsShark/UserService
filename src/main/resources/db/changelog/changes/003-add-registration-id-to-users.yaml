@@ -1,0 +1,15 @@
+databaseChangeLog:
+  - changeSet:
+      id: add-registration-id-to-users
+      author: arsshark
+      changes:
+        - addColumn:
+            tableName: users
+            columns:
+              - column:
+                  name: registration_id
+                  type: UUID
+        - addUniqueConstraint:
+            tableName: users
+            columnNames: registration_id
+            constraintName: uq_users_registration_id

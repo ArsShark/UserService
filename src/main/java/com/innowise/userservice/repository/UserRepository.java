@@ -3,6 +3,7 @@ package com.innowise.userservice.repository;
 import com.innowise.userservice.entity.User;
 import java.time.Instant;
 import java.util.Optional;
+import java.util.UUID;
 import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
@@ -25,6 +26,15 @@ public interface UserRepository extends JpaRepository<User, Long>, JpaSpecificat
    * @return the user, or an empty optional if there is none
    */
   Optional<User> findByEmail(String email);
+
+  /**
+   * Finds the profile that was created with the given registration id. The id is unique, so there
+   * is at most one.
+   *
+   * @param registrationId the id that the creating service sent
+   * @return the user, or an empty optional if no profile was created with this id
+   */
+  Optional<User> findByRegistrationId(UUID registrationId);
 
   /**
    * Checks whether a user with the given normalized (lowercase) email exists.

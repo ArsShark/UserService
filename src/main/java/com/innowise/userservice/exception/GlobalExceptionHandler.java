@@ -39,6 +39,9 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
   /** Name of the UNIQUE constraint on {@code users.email} (Liquibase changelog 001). */
   private static final String UNIQUE_USERS_EMAIL = "uq_users_email";
 
+  /** Name of the UNIQUE constraint on {@code users.registration_id} (changelog 003). */
+  private static final String UNIQUE_USERS_REGISTRATION_ID = "uq_users_registration_id";
+
   /** Name of the UNIQUE constraint on {@code payment_cards.number} (changelog 002). */
   private static final String UNIQUE_CARDS_NUMBER = "uq_payment_cards_number";
 
@@ -60,6 +63,7 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
   @ExceptionHandler({
     EmailAlreadyExistsException.class,
     CardNumberAlreadyExistsException.class,
+    RegistrationIdAlreadyUsedException.class,
     CardLimitExceededException.class})
   public ResponseEntity<ProblemDetail> handleConflict(RuntimeException ex) {
     return reject(HttpStatus.CONFLICT, ex);
@@ -70,7 +74,7 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
    *
    * <p>The services check uniqueness before saving, but two parallel requests can both pass the
    * check; then the UNIQUE constraint is the real guard and the violation arrives here. Only
-   * the two known unique constraints are a client error (409). Any other violation (NOT NULL,
+   * the three known unique constraints are a client error (409). Any other violation (NOT NULL,
    * length, foreign key) means a bug on our side and becomes a 500.
    *
    * <p>The exception itself is not logged: its message contains the failing row, including the
@@ -85,6 +89,9 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     }
     if (UNIQUE_CARDS_NUMBER.equals(constraint)) {
       return reject(HttpStatus.CONFLICT, new CardNumberAlreadyExistsException());
+    }
+    if (UNIQUE_USERS_REGISTRATION_ID.equals(constraint)) {
+      return reject(HttpStatus.CONFLICT, new RegistrationIdAlreadyUsedException());
     }
     LOGGER.error("Unexpected data integrity violation, constraint: {}", constraint);
     return internalError();

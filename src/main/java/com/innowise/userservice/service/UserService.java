@@ -10,6 +10,7 @@ import com.innowise.userservice.mapper.UserMapper;
 import com.innowise.userservice.repository.UserRepository;
 import com.innowise.userservice.repository.specification.UserSpecifications;
 import com.innowise.userservice.config.CacheConfig;
+import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.cache.annotation.CacheEvict;
@@ -53,12 +54,29 @@ public class UserService {
    */
   @Transactional
   public UserResponse create(UserRequest request) {
+    return create(request, null);
+  }
+
+  /**
+   * Creates an active user without cards and remembers the registration id of the attempt that
+   * created it. The Authentication Service sends the id so that it can delete the profile of a
+   * failed registration even when it never learned the id of the profile (the answer was lost).
+   *
+   * @param request user data; the email is normalized before it is checked and stored
+   * @param registrationId the id of the attempt to register, or {@code null} for a profile that
+   *     is not created by a registration
+   * @return the created user
+   * @throws EmailAlreadyExistsException if the normalized email is already used
+   */
+  @Transactional
+  public UserResponse create(UserRequest request, UUID registrationId) {
     String email = EmailNormalizer.normalize(request.email());
     if (userRepository.existsByEmail(email)) {
       throw new EmailAlreadyExistsException();
     }
     User user = userMapper.toEntity(request);
     user.setEmail(email);
+    user.setRegistrationId(registrationId);
     User saved = userRepository.save(user);
     LOGGER.info("Created user with id {}", saved.getId());
     return userMapper.toResponse(saved);
@@ -79,6 +97,24 @@ public class UserService {
     User user = userRepository.findByIdWithCards(id)
       .orElseThrow(() -> new UserNotFoundException(id));
     return userMapper.toResponseWithCards(user);
+  }
+
+  /**
+   * Finds a user by email. The Order Service uses it to turn the email of an access token into a
+   * profile.
+   *
+   * <p>The email is normalized like on creation, so the lookup does not depend on the case or on
+   * surrounding spaces. An inactive user is returned too, with its flag. The answer has no cards
+   * and is not cached: the cache is keyed by user id.
+   *
+   * @param email an email as the caller knows it
+   * @return the user without cards
+   * @throws UserNotFoundException if nobody has this email; the message does not contain it
+   */
+  public UserResponse getByEmail(String email) {
+    return userRepository.findByEmail(EmailNormalizer.normalize(email))
+      .map(userMapper::toResponse)
+      .orElseThrow(UserNotFoundException::forEmail);
   }
 
   /**
@@ -155,6 +191,33 @@ public class UserService {
     User user = getUserOrThrow(id);
     userRepository.delete(user);
     LOGGER.info("Deleted user with id {}", id);
+  }
+
+  /**
+   * Deletes the profile that was created with the given registration id, together with its
+   * cards. The Authentication Service uses it to undo a registration, also when the answer of
+   * the creation was lost and it does not know the id of the profile. The registration id
+   * belongs to one attempt, so no other profile can be affected, not even one with the same
+   * email.
+   *
+   * <p>The cache entry of the deleted user is evicted after the commit. The cache key is the id
+   * of the user, which the caller of this method does not have, so the method returns it and the
+   * annotation reads it from the result.
+   *
+   * @param registrationId the id that was sent with the creation
+   * @return the id of the deleted user
+   * @throws UserNotFoundException if no profile was created with this id (the caller treats that
+   *     as "already gone")
+   */
+  @CacheEvict(cacheNames = CacheConfig.USERS, key = "#result")
+  @Transactional
+  public Long deleteByRegistrationId(UUID registrationId) {
+    User user = userRepository.findByRegistrationId(registrationId)
+      .orElseThrow(UserNotFoundException::forRegistration);
+    Long id = user.getId();
+    userRepository.delete(user);
+    LOGGER.info("Deleted user with id {} (undoing registration {})", id, registrationId);
+    return id;
   }
 
   private User getUserOrThrow(Long id) {

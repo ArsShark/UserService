@@ -8,6 +8,8 @@ import com.innowise.userservice.entity.User;
 import com.innowise.userservice.exception.CardNumberAlreadyExistsException;
 import com.innowise.userservice.exception.EmailAlreadyExistsException;
 import com.innowise.userservice.exception.GlobalExceptionHandler;
+import com.innowise.userservice.exception.RegistrationIdAlreadyUsedException;
+import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -38,6 +40,24 @@ class UniqueViolationHandlingTest extends AbstractRepositoryTest {
     assertAll(
       () -> assertEquals(409, response.getStatusCode().value()),
       () -> assertEquals(new EmailAlreadyExistsException().getMessage(),
+        response.getBody().getDetail()));
+  }
+
+  /** Two profiles of different emails that carry the same registration id. */
+  @Test
+  void duplicateRegistrationIdIsMappedTo409() {
+    UUID registrationId = UUID.fromString("0b9c4b5e-6f3e-4a56-9d3a-5f6f0d2a7c11");
+    User first = TestEntities.user("Anna", "Petrova", "anna@example.com");
+    first.setRegistrationId(registrationId);
+    userRepository.save(first);
+    User duplicate = TestEntities.user("Ivan", "Petrov", "ivan@example.com");
+    duplicate.setRegistrationId(registrationId);
+
+    ResponseEntity<ProblemDetail> response = translate(duplicate);
+
+    assertAll(
+      () -> assertEquals(409, response.getStatusCode().value()),
+      () -> assertEquals(new RegistrationIdAlreadyUsedException().getMessage(),
         response.getBody().getDetail()));
   }
 

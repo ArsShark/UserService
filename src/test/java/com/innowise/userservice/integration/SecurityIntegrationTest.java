@@ -4,6 +4,7 @@ import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -299,7 +300,86 @@ class SecurityIntegrationTest extends AbstractIntegrationTest {
         () -> assertEquals(0, countRows("payment_cards")));
   }
 
-  /** Only two endpoints are opened; with the right key the rest of /internal stays closed. */
+  /** The caller knows the email only from a token: its case and spaces must not matter. */
+  @Test
+  void theInternalLookupFindsTheProfileByAnyFormOfTheEmailWithoutCardsAndWithoutCaching()
+      throws Exception {
+    long id = createUser("Anna", "Petrova", "anna@example.com");
+    createCard(id, cardNumber(1));
+
+    MvcResult found = anonymous.perform(get("/internal/users/by-email")
+        .param("email", "  Anna@Example.COM ")
+        .header(InternalKeyAuthenticationFilter.HEADER, internalKey)).andExpectAll(
+        status().isOk(),
+        jsonPath("$.email").value("anna@example.com"),
+        jsonPath("$.name").value("Anna"),
+        jsonPath("$.active").value(true),
+        jsonPath("$.cards").doesNotExist()).andReturn();
+
+    assertAll(
+        () -> assertEquals(id, idOf(found)),
+        () -> assertTrue(cacheKeys().isEmpty(), "the lookup by email is not cached"));
+  }
+
+  /** The Order Service decides what an inactive profile means; this endpoint only reports it. */
+  @Test
+  void theInternalLookupReturnsAnInactiveProfileWithItsFlag() throws Exception {
+    long id = createUser("Anna", "Petrova", "anna@example.com");
+    mockMvc.perform(userStatus(id, false)).andExpect(status().isOk());
+
+    anonymous.perform(get("/internal/users/by-email")
+        .param("email", "anna@example.com")
+        .header(InternalKeyAuthenticationFilter.HEADER, internalKey)).andExpectAll(
+        status().isOk(),
+        jsonPath("$.active").value(false));
+  }
+
+  @Test
+  void theInternalLookupOfAnUnknownOrBlankEmailIsA404ThatNamesNoEmail() throws Exception {
+    createUser("Anna", "Petrova", "anna@example.com");
+
+    for (String email : new String[] {"nobody-4711@example.com", "   "}) {
+      MvcResult result = anonymous.perform(get("/internal/users/by-email")
+          .param("email", email)
+          .header(InternalKeyAuthenticationFilter.HEADER, internalKey)).andExpectAll(
+          status().isNotFound(),
+          problemJson()).andReturn();
+
+      assertFalse(bodyOf(result).contains("nobody-4711"), "the answer must not echo the email");
+    }
+  }
+
+  @Test
+  void theInternalLookupWithoutTheParameterIsA400() throws Exception {
+    anonymous.perform(get("/internal/users/by-email")
+        .header(InternalKeyAuthenticationFilter.HEADER, internalKey)).andExpectAll(
+        status().isBadRequest(),
+        problemJson());
+  }
+
+  /** A missing key, a wrong key and an admin token all get no hint whether the profile exists. */
+  @Test
+  void theInternalLookupNeedsTheKeyAndNeverRevealsTheProfileWithout() throws Exception {
+    createUser("Anna", "Petrova", "anna@example.com");
+
+    MvcResult missing = anonymous.perform(get("/internal/users/by-email")
+        .param("email", "anna@example.com")).andExpect(status().isUnauthorized()).andReturn();
+    MvcResult wrong = anonymous.perform(get("/internal/users/by-email")
+        .param("email", "anna@example.com")
+        .header(InternalKeyAuthenticationFilter.HEADER, "wrong-key"))
+        .andExpect(status().isUnauthorized()).andReturn();
+    MvcResult admin = mockMvc.perform(get("/internal/users/by-email")
+        .param("email", "anna@example.com")).andExpectAll(
+        status().isForbidden(),
+        jsonPath("$.detail").value(ACCESS_DENIED)).andReturn();
+
+    assertAll(
+        () -> assertEquals(bodyOf(missing), bodyOf(wrong)),
+        () -> assertTrue(bodyOf(missing).contains(AUTHENTICATION_REQUIRED)),
+        () -> assertFalse(bodyOf(admin).contains("anna@example.com")));
+  }
+
+  /** Only three endpoints are opened; with the right key the rest of /internal stays closed. */
   @Test
   void anInternalPathThatDoesNotExistIsHiddenFromAnonymousCallersAndClosedToTheKey()
       throws Exception {
