@@ -3303,7 +3303,164 @@
           }
         },
         {
-          "name": "69 Rollback: delete the profile of user A (internal key)",
+          "name": "69 Internal creation with a registration id: the id is stored and never returned",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set(\"registrationId\", pm.variables.replaceIn(\"{{$guid}}\"));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 201\", function () {",
+                  "  pm.response.to.have.status(201);",
+                  "});",
+                  "pm.test(\"The registration id is not in the answer\", function () {",
+                  "  pm.expect(pm.response.text()).to.not.include(pm.collectionVariables.get(\"registrationId\"));",
+                  "});",
+                  "pm.test(\"There is no registrationId field\", function () {",
+                  "  pm.expect(pm.response.json()).to.not.have.property(\"registrationId\");",
+                  "});",
+                  "pm.collectionVariables.set(\"attemptUserId\", pm.response.json().id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-Internal-Key",
+                "value": "{{internalKey}}"
+              },
+              {
+                "key": "X-Registration-Id",
+                "value": "{{registrationId}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/internal/users",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "internal",
+                "users"
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Registered\",\n  \"surname\": \"Attempt{{run5}}\",\n  \"birthDate\": \"1991-03-21\",\n  \"email\": \"attempt.{{run5}}@example.com\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "70 Undoing by the registration id: the profile of that attempt is deleted (204)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 204\", function () {",
+                  "  pm.response.to.have.status(204);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "X-Internal-Key",
+                "value": "{{internalKey}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/internal/users/by-registration/{{registrationId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "internal",
+                "users",
+                "by-registration",
+                "{{registrationId}}"
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "name": "71 Undoing again: 404 that does not echo the id (the caller treats it as already gone)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 404\", function () {",
+                  "  pm.response.to.have.status(404);",
+                  "});",
+                  "pm.test(\"Content-Type is application/problem+json\", function () {",
+                  "  pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\");",
+                  "});",
+                  "pm.test(\"The answer does not contain the id\", function () {",
+                  "  pm.expect(pm.response.text()).to.not.include(pm.collectionVariables.get(\"registrationId\"));",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "X-Internal-Key",
+                "value": "{{internalKey}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/internal/users/by-registration/{{registrationId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "internal",
+                "users",
+                "by-registration",
+                "{{registrationId}}"
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "name": "72 Rollback: delete the profile of user A (internal key)",
           "event": [
             {
               "listen": "test",
@@ -3342,7 +3499,7 @@
           }
         },
         {
-          "name": "70 Rollback: delete the profile of user B (internal key)",
+          "name": "73 Rollback: delete the profile of user B (internal key)",
           "event": [
             {
               "listen": "test",
@@ -3381,7 +3538,7 @@
           }
         },
         {
-          "name": "71 Rollback again: 404, which the Gateway treats as already rolled back",
+          "name": "74 Rollback again: 404, which the Gateway treats as already rolled back",
           "event": [
             {
               "listen": "test",
@@ -3420,7 +3577,7 @@
           }
         },
         {
-          "name": "72 The cards went with the profiles (cascade)",
+          "name": "75 The cards went with the profiles (cascade)",
           "event": [
             {
               "listen": "test",
