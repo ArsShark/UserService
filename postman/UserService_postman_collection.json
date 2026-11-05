@@ -3414,7 +3414,7 @@
           }
         },
         {
-          "name": "71 Undoing again: 404 that does not echo the id (the caller treats it as already gone)",
+          "name": "71 Undoing again: 404 whose detail does not echo the id (the caller treats it as already gone)",
           "event": [
             {
               "listen": "test",
@@ -3427,8 +3427,8 @@
                   "pm.test(\"Content-Type is application/problem+json\", function () {",
                   "  pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\");",
                   "});",
-                  "pm.test(\"The answer does not contain the id\", function () {",
-                  "  pm.expect(pm.response.text()).to.not.include(pm.collectionVariables.get(\"registrationId\"));",
+                  "pm.test(\"The detail does not contain the id\", function () {",
+                  "  pm.expect(pm.response.json().detail).to.not.include(pm.collectionVariables.get(\"registrationId\"));",
                   "});"
                 ]
               }

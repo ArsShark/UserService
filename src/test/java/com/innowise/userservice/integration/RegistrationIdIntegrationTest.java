@@ -139,16 +139,19 @@ class RegistrationIdIntegrationTest extends AbstractIntegrationTest {
         () -> assertEquals(1L, countRows("payment_cards")));
   }
 
-  /** The caller repeats a deletion that may already have worked: the 404 is "already gone". */
+  /**
+   * The caller repeats a deletion that may already have worked: the 404 is "already gone". The
+   * detail does not repeat the id; the field {@code instance} is the path that the caller sent.
+   */
   @Test
-  void aSecondDeletionAnswers404WithoutTheIdAndChangesNothing() throws Exception {
+  void aSecondDeletionAnswers404WithoutTheIdInTheDetailAndChangesNothing() throws Exception {
     createInternally("anna@example.com", ID).andExpect(status().isCreated());
     deleteInternally(ID).andExpect(status().isNoContent());
 
     deleteInternally(ID).andExpectAll(
         status().isNotFound(),
         content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON),
-        content().string(not(containsString(ID))));
+        jsonPath("$.detail").value(not(containsString(ID))));
 
     assertEquals(0L, countRows("users"));
   }
