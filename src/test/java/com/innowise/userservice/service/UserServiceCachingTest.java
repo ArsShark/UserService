@@ -21,6 +21,7 @@ import com.innowise.userservice.repository.UserRepository;
 import java.time.LocalDate;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.UUID;
 import java.util.function.Consumer;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.BeforeEach;
@@ -50,6 +51,8 @@ class UserServiceCachingTest {
 
   private static final Long USER_ID = 7L;
   private static final Long OTHER_USER_ID = 8L;
+  private static final UUID REGISTRATION_ID =
+    UUID.fromString("0b9c4b5e-6f3e-4a56-9d3a-5f6f0d2a7c11");
   private static final UserRequest REQUEST = new UserRequest("Ivan", "Petrov",
     LocalDate.of(1990, 5, 17), "ivan@example.com");
 
@@ -67,6 +70,8 @@ class UserServiceCachingTest {
     Objects.requireNonNull(cacheManager.getCache(CacheConfig.USERS)).clear();
     stubUser(USER_ID);
     stubUser(OTHER_USER_ID);
+    when(userRepository.findByRegistrationId(REGISTRATION_ID))
+      .thenReturn(Optional.of(user(USER_ID)));
     when(userRepository.saveAndFlush(any(User.class))).thenAnswer(call -> call.getArgument(0));
     when(userRepository.updateActiveById(any(), anyBoolean(), any())).thenReturn(1);
   }
@@ -133,10 +138,14 @@ class UserServiceCachingTest {
     Consumer<UserService> update = service -> service.update(USER_ID, REQUEST);
     Consumer<UserService> setActive = service -> service.setActive(USER_ID, false);
     Consumer<UserService> delete = service -> service.delete(USER_ID);
+    // The cache key is the id of the user, read from the result of the method.
+    Consumer<UserService> deleteByRegistrationId =
+      service -> service.deleteByRegistrationId(REGISTRATION_ID);
     return Stream.of(
       Arguments.of("update", update),
       Arguments.of("setActive", setActive),
-      Arguments.of("delete", delete));
+      Arguments.of("delete", delete),
+      Arguments.of("deleteByRegistrationId", deleteByRegistrationId));
   }
 
   private void stubUser(Long id) {

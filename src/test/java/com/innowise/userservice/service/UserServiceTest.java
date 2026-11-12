@@ -3,6 +3,8 @@ package com.innowise.userservice.service;
 import static com.innowise.userservice.service.ServiceTestEntities.user;
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
@@ -29,6 +31,7 @@ import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
+import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -95,6 +98,43 @@ class UserServiceTest {
   }
 
   @Test
+  void createStoresTheRegistrationIdOfTheAttempt() {
+    UserRequest request = request("ivan@example.com");
+    UUID registrationId = UUID.fromString("0b9c4b5e-6f3e-4a56-9d3a-5f6f0d2a7c11");
+    User mapped = user(null);
+    mapped.setEmail(null);
+    User saved = user(USER_ID);
+    UserResponse expected = response(USER_ID, "ivan@example.com");
+    when(userRepository.existsByEmail("ivan@example.com")).thenReturn(false);
+    when(userMapper.toEntity(request)).thenReturn(mapped);
+    when(userRepository.save(mapped)).thenReturn(saved);
+    when(userMapper.toResponse(saved)).thenReturn(expected);
+
+    UserResponse actual = userService.create(request, registrationId);
+
+    assertAll(
+      () -> assertSame(expected, actual),
+      () -> assertEquals(registrationId, mapped.getRegistrationId()));
+  }
+
+  /** A profile that is not created by a registration (an admin creates it) has no id. */
+  @Test
+  void createWithoutARegistrationIdLeavesItEmpty() {
+    UserRequest request = request("ivan@example.com");
+    User mapped = user(null);
+    mapped.setEmail(null);
+    User saved = user(USER_ID);
+    when(userRepository.existsByEmail("ivan@example.com")).thenReturn(false);
+    when(userMapper.toEntity(request)).thenReturn(mapped);
+    when(userRepository.save(mapped)).thenReturn(saved);
+    when(userMapper.toResponse(saved)).thenReturn(response(USER_ID, "ivan@example.com"));
+
+    userService.create(request);
+
+    assertNull(mapped.getRegistrationId());
+  }
+
+  @Test
   void createRejectsEmailThatIsAlreadyUsed() {
     when(userRepository.existsByEmail("ivan@example.com")).thenReturn(true);
 
@@ -138,6 +178,45 @@ class UserServiceTest {
     assertThrows(UserNotFoundException.class, () -> userService.getById(USER_ID));
 
     verifyNoInteractions(userMapper);
+  }
+
+  @Test
+  void getByEmailFindsTheUserByTheNormalizedEmail() {
+    User found = user(USER_ID);
+    UserResponse expected = response(USER_ID, "ivan.petrov@example.com");
+    when(userRepository.findByEmail("ivan.petrov@example.com")).thenReturn(Optional.of(found));
+    when(userMapper.toResponse(found)).thenReturn(expected);
+
+    assertSame(expected, userService.getByEmail("  Ivan.Petrov@Example.COM "));
+  }
+
+  @Test
+  void getByEmailRejectsAnUnknownEmailWithoutNamingIt() {
+    when(userRepository.findByEmail("nobody@example.com")).thenReturn(Optional.empty());
+
+    UserNotFoundException thrown = assertThrows(UserNotFoundException.class,
+      () -> userService.getByEmail("Nobody@Example.com"));
+
+    assertAll(
+      () -> assertFalse(thrown.getMessage().toLowerCase(Locale.ROOT).contains("nobody")),
+      () -> verifyNoInteractions(userMapper));
+  }
+
+  @Test
+  void getByEmailNormalizesIndependentlyOfDefaultLocale() {
+    Locale original = Locale.getDefault();
+    // In the Turkish locale a plain toLowerCase() turns "I" into a dotless i.
+    Locale.setDefault(Locale.forLanguageTag("tr-TR"));
+    try {
+      User found = user(USER_ID);
+      UserResponse expected = response(USER_ID, "info@example.com");
+      when(userRepository.findByEmail("info@example.com")).thenReturn(Optional.of(found));
+      when(userMapper.toResponse(found)).thenReturn(expected);
+
+      assertSame(expected, userService.getByEmail("INFO@Example.COM"));
+    } finally {
+      Locale.setDefault(original);
+    }
   }
 
   @Test
@@ -275,6 +354,32 @@ class UserServiceTest {
     assertAll(
       () -> verify(userRepository).delete(existing),
       () -> verify(userRepository, never()).deleteById(any()));
+  }
+
+  @Test
+  void deleteByRegistrationIdRemovesTheLoadedProfileAndReturnsItsId() {
+    UUID registrationId = UUID.fromString("0b9c4b5e-6f3e-4a56-9d3a-5f6f0d2a7c11");
+    User existing = user(USER_ID);
+    when(userRepository.findByRegistrationId(registrationId)).thenReturn(Optional.of(existing));
+
+    Long deleted = userService.deleteByRegistrationId(registrationId);
+
+    assertAll(
+      () -> assertEquals(USER_ID, deleted),
+      () -> verify(userRepository).delete(existing));
+  }
+
+  @Test
+  void deleteByRegistrationIdRejectsAnUnknownIdWithoutNamingIt() {
+    UUID registrationId = UUID.fromString("0b9c4b5e-6f3e-4a56-9d3a-5f6f0d2a7c11");
+    when(userRepository.findByRegistrationId(registrationId)).thenReturn(Optional.empty());
+
+    UserNotFoundException error = assertThrows(UserNotFoundException.class,
+      () -> userService.deleteByRegistrationId(registrationId));
+
+    assertAll(
+      () -> assertFalse(error.getMessage().contains(registrationId.toString())),
+      () -> verify(userRepository, never()).delete(any(User.class)));
   }
 
   @Test

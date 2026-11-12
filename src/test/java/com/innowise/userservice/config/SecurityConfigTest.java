@@ -124,11 +124,14 @@ class SecurityConfigTest {
         Arguments.of("DELETE", "/api/cards/1"));
   }
 
-  /** The two internal endpoints with their methods. */
+  /** The four internal endpoints with their methods. */
   static Stream<Arguments> internalEndpoints() {
     return Stream.of(
         Arguments.of("POST", "/internal/users"),
-        Arguments.of("DELETE", "/internal/users/1"));
+        Arguments.of("GET", "/internal/users/by-email"),
+        Arguments.of("DELETE", "/internal/users/1"),
+        Arguments.of("DELETE",
+            "/internal/users/by-registration/0b9c4b5e-6f3e-4a56-9d3a-5f6f0d2a7c11"));
   }
 
   /** What a user with the profile id 7 may do: his own profile, his cards, and card 1. */
@@ -377,10 +380,16 @@ class SecurityConfigTest {
             jsonPath("$.detail").value(ACCESS_DENIED));
   }
 
-  /** Only the two endpoints are opened, each with its method; the rest of /internal is closed. */
+  /** Only the four endpoints are opened, each with its method; the rest of /internal is closed. */
   @ParameterizedTest(name = "{0} {1}")
   @ValueSource(strings = {"GET /internal/users", "PUT /internal/users/1",
-      "GET /internal/users/1", "POST /internal/other", "DELETE /internal/users"})
+      "GET /internal/users/1", "POST /internal/other", "DELETE /internal/users",
+      "POST /internal/users/by-email", "PUT /internal/users/by-email",
+      "GET /internal/users/by-email/1",
+      "GET /internal/users/by-registration/0b9c4b5e-6f3e-4a56-9d3a-5f6f0d2a7c11",
+      "POST /internal/users/by-registration/0b9c4b5e-6f3e-4a56-9d3a-5f6f0d2a7c11",
+      "PUT /internal/users/by-registration/0b9c4b5e-6f3e-4a56-9d3a-5f6f0d2a7c11",
+      "DELETE /internal/users/by-registration/0b9c4b5e-6f3e-4a56-9d3a-5f6f0d2a7c11/1"})
   void everythingElseUnderInternalStaysClosedEvenWithTheRightKey(String endpoint)
       throws Exception {
     String[] parts = endpoint.split(" ");

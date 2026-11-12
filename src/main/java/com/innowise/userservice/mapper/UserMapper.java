@@ -13,7 +13,8 @@ import org.mapstruct.ReportingPolicy;
  * Converts between {@link User} and user DTOs.
  *
  * <p>The email is never copied from a request: the service normalizes it (strip and lower-case)
- * to check uniqueness first, and then sets the normalized value itself.
+ * to check uniqueness first, and then sets the normalized value itself. The registration id comes
+ * from a header, not from a body, so the service sets it too.
  */
 @Mapper(
   componentModel = "spring",
@@ -31,11 +32,13 @@ public interface UserMapper {
   @Mapping(target = "email", ignore = true)
   @Mapping(target = "active", ignore = true)
   @Mapping(target = "cards", ignore = true)
+  @Mapping(target = "registrationId", ignore = true)
   User toEntity(UserRequest request);
 
   /** Replaces the editable fields of an existing user; email, active flag and cards are kept. */
   @Mapping(target = "email", ignore = true)
   @Mapping(target = "active", ignore = true)
   @Mapping(target = "cards", ignore = true)
+  @Mapping(target = "registrationId", ignore = true)
   void updateEntity(UserRequest request, @MappingTarget User user);
 }
